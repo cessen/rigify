@@ -33,38 +33,58 @@ class Rig:
         master_name = temp_name + "_master"
         ctrl_bone_master = self.obj.data.edit_bones.new(master_name)
         ctrl_bone_master.head[:] = self.obj.data.edit_bones[org_name].head
-        ctrl_bone_master.tail[:] = self.obj.data.edit_bones[-3].tail
+        ctrl_bone_master.tail[:] = self.obj.data.edit_bones[self.org_bones[-1]].tail
         ctrl_bone_master.roll    = self.obj.data.edit_bones[org_name].roll
         ctrl_bone_master.parent  = self.obj.data.edit_bones[org_name].parent
         
         for i in range(len(self.org_bones)):
+            eb = self.obj.data.edit_bones
+
+            for name in eb:
+                print( name.name )
+
+            print( len( eb ))
+
             name = self.org_bones[i]
 
             # Create control and deformation bones
             temp_name    = strip_org(name)
+            print( i, " base: ", temp_name )
+            print( len( eb ))
             ctrl_bone    = copy_bone(self.obj, name, temp_name)
-            mch_bone     = copy_bone(self.obj, name, make_mechanism_name(strip_org(name)))
-            print( "returned: ", mch_bone )
-            def_bone     = copy_bone(self.obj, name, make_deformer_name(strip_org(name)))
+            print( i, " ctrl bone: ", ctrl_bone )
+            print( len( eb ))
+            mch_bone     = copy_bone(self.obj, name, make_mechanism_name(temp_name))
+            print( i, " mch bone: ", mch_bone )
+            print( len( eb ))
+            def_bone     = copy_bone(self.obj, name, make_deformer_name(temp_name))
+            print( i, " def bone: ", def_bone )
+            print( len( eb ))
             mch_bone_drv = copy_bone(self.obj, name, mch_bone + "_drv")
-            
-            eb = self.obj.data.edit_bones
-            
-            print( i )
-            for name in eb:
-                print( name.name )
-            
+            print( i, " drv bone: ", mch_bone_drv )
+            print( len( eb ))
+                        
             ctrl_bone_e     = eb[ctrl_bone]
-            def_bone_e      = eb[def_bone]
+            print( len( eb ))
             mch_bone_e      = eb[mch_bone]
+            print( len( eb ))
+            def_bone_e      = eb[def_bone]
+            print( len( eb ))
             mch_bone_drv_e  = eb[mch_bone_drv]
+            print( len( eb ))
 
+            # Add to list
+            ctrl_chain    += [ctrl_bone]
+            def_chain     += [def_bone]
+            mch_chain     += [mch_bone]
+            mch_drv_chain += [mch_bone_drv]
+            
             # Parenting
             if i == 0:
                 # First ctl bone
-                ctrl_bone_e.parent = mch_bone_drv_e
+                ctrl_bone_e.parent    = mch_bone_drv_e
                 # First def bone
-                def_bone_e.parent = eb[self.org_bones[0]].parent
+                def_bone_e.parent     = eb[self.org_bones[0]].parent
                 # First mch driver bone
                 mch_bone_drv_e.parent = eb[self.org_bones[0]].parent
             else:
@@ -78,11 +98,7 @@ class Rig:
                 mch_bone_drv_e.parent      = eb[ctrl_chain[-1]]
                 mch_bone_drv_e.use_connect = False
 
-            # Add to list
-            ctrl_chain    += [ctrl_bone]
-            def_chain     += [def_bone]
-            mch_chain     += [mch_bone]
-            mch_drv_chain += [mch_bone_drv]
+
                 
             # Parenting mch bone
             mch_bone_e.parent = ctrl_bone_e
