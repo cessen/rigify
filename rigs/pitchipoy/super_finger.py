@@ -77,7 +77,7 @@ class Rig:
             def_bone_e     = eb[def_chain[i]]
             ctrl_bone_e    = eb[ctrl_chain[i]]
             mch_bone_e     = eb[mch_chain[i]]
-            mch_drv_bone_e = eb[mch_drv_chain[i]]
+            mch_bone_drv_e = eb[mch_drv_chain[i]]
             
             if i == 0:
                 # First ctl bone
@@ -91,32 +91,44 @@ class Rig:
                 mch_bone_drv_e.use_connect  = False
             else:
                 # The rest
+                print (ctrl_bone_e.parent)
                 ctrl_bone_e.parent         = mch_bone_drv_e
                 ctrl_bone_e.use_connect    = False 
+                print (ctrl_bone_e.parent)
                 
+                print (def_bone_e.parent)
                 def_bone_e.parent          = eb[def_chain[i-1]]
                 def_bone_e.use_connect     = True
-
+                print (def_bone_e.parent)
+                
+                print (mch_bone_drv_e.parent)
                 mch_bone_drv_e.parent      = eb[ctrl_chain[i-1]]
                 mch_bone_drv_e.use_connect = False
+                print (mch_bone_drv_e.parent)
 
             # Parenting mch bone
             mch_bone_e.parent = ctrl_bone_e
             mch_bone_e.use_connect = False
                 
-        # Creating last conrtol bone 
-        ctrl_bone_last = self.obj.data.edit_bones.new(temp_name)
-        ctrl_bone_last.head[:] = eb[ctrl_chain[-1]].tail
+        # Creating tip conrtol bone 
+        ctrl_bone_tip = self.obj.data.edit_bones.new(temp_name)
+        ctrl_bone_tip.head[:] = eb[ctrl_chain[-1]].tail
         tail_vec = Vector((0, 0.1, 0)) * self.obj.matrix_world
-        ctrl_bone_last.tail[:] = eb[ctrl_chain[-1]].tail + tail_vec
-        ctrl_bone_last.roll    = eb[ctrl_chain[-1]].roll
-        ctrl_bone_last.parent  = eb[ctrl_chain[-1]]
-
+        ctrl_bone_tip.tail[:] = eb[ctrl_chain[-1]].tail + tail_vec
+        ctrl_bone_tip.roll    = eb[ctrl_chain[-1]].roll
+        ctrl_bone_tip.parent  = eb[ctrl_chain[-1]]
+        tip_name    = ctrl_bone_tip.name
 
         bpy.ops.object.mode_set(mode ='OBJECT')
         
         pb = self.obj.pose.bones
-       
+        
+        # Setting pose bones locks
+        pb[master_name].lock_scale = True,False,True
+        
+        pb[tip_name].lock_scale    = True,True,True
+        pb[tip_name].lock_rotation = True,True,True
+        
         # Pose settings
         for org, ctrl, deform, mch, mch_drv in zip(self.org_bones, ctrl_chain, def_chain, mch_chain, mch_drv_chain):
             
@@ -133,7 +145,7 @@ class Rig:
                 
                 con           = pb[deform].constraints.new('DAMPED_TRACK')
                 con.target    = self.obj
-                con.subtarget = master_name
+                con.subtarget = ctrl_chain[ctrl_chain.index(ctrl)+1]
             else:
                 con           = pb[deform].constraints.new('COPY_TRANSFORMS')
                 con.target    = self.obj
@@ -143,11 +155,11 @@ class Rig:
             if mch_chain.index(mch) == len(mch_chain) - 1:
                 con           = pb[mch].constraints.new('DAMPED_TRACK')
                 con.target    = self.obj
-                con.subtarget = ctrl_bone_last.name
+                con.subtarget = tip_name
                 
                 con           = pb[mch].constraints.new('STRETCH_TO')
                 con.target    = self.obj
-                con.subtarget = ctrl_bone_last.name
+                con.subtarget = tip_name
                 con.volume    = 'NO_VOLUME'
             else:
                 con           = pb[mch].constraints.new('DAMPED_TRACK')
@@ -174,14 +186,14 @@ class Rig:
             
             else:
                 # Drivers
-                drv               = pb[mch_drv].driver_add("rotation", 0).driver
-                drv.type          ='SCRIPTED'
-                drv.expression    = '(1-sy)*pi'
-                drv               = our_driver.variables.new()
-                drv.name          = "scale_y"
-                drv.type          = "SINGLE_PROP"
-                drv.targets[0].id = self.obj
-                drv.targets[0].data_path = pb[master_name].path_from_id() + '.scale.y'
+                drv                          = pb[mch_drv].driver_add("rotation_euler", 0).driver
+                drv.type                     = 'SCRIPTED'
+                drv.expression               = '(1-sy)*pi'
+                drv_var                      = drv.variables.new()
+                drv_var.name                 = 'sy'
+                drv_var.type                 = "SINGLE_PROP"
+                drv_var.targets[0].id        = self.obj
+                drv_var.targets[0].data_path = pb[master_name].path_from_id() + '.scale.y'
             
             # Assigning shapes to control bones
             create_circle_widget(self.obj, ctrl, radius=0.3, head_tail=0.5)
