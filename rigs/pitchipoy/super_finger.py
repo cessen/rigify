@@ -4,7 +4,14 @@ from ...utils import copy_bone
 from ...utils import strip_org, make_deformer_name, connected_children_names, make_mechanism_name
 from ...utils import create_circle_widget
 from ...utils import MetarigError
+from rna_prop_ui import rna_idprop_ui_prop_get
 
+script = """
+controls = [%s]
+for name in controls[1:-1]:
+    if is_selected(name):
+        layout.prop(pb[master_name], '["finger_curve"]', text="Curvature", slider=True)
+"""
 
 class Rig:
     
@@ -86,6 +93,9 @@ class Rig:
                 # First def bone
                 def_bone_e.parent       = eb[self.org_bones[i]].parent
                 def_bone_e.use_connect  = False
+                # First mch bone
+                mch_bone_e.parent = eb[self.org_bones[i]].parent
+                mch_bone_e.use_connect  = False
                 # First mch driver bone
                 mch_bone_drv_e.parent = eb[self.org_bones[i]].parent
                 mch_bone_drv_e.use_connect  = False
@@ -106,14 +116,14 @@ class Rig:
                 mch_bone_drv_e.use_connect = False
                 print (mch_bone_drv_e.parent)
 
-            # Parenting mch bone
-            mch_bone_e.parent = ctrl_bone_e
-            mch_bone_e.use_connect = False
+                # Parenting mch bone
+                mch_bone_e.parent = ctrl_bone_e
+                mch_bone_e.use_connect = False
                 
         # Creating tip conrtol bone 
         ctrl_bone_tip = self.obj.data.edit_bones.new(temp_name)
         ctrl_bone_tip.head[:] = eb[ctrl_chain[-1]].tail
-        tail_vec = Vector((0, 0.1, 0)) * self.obj.matrix_world
+        tail_vec = Vector((0, 0, 0.5)) * self.obj.matrix_world
         ctrl_bone_tip.tail[:] = eb[ctrl_chain[-1]].tail + tail_vec
         ctrl_bone_tip.roll    = eb[ctrl_chain[-1]].roll
         ctrl_bone_tip.parent  = eb[ctrl_chain[-1]]
@@ -124,11 +134,20 @@ class Rig:
         pb = self.obj.pose.bones
         
         # Setting pose bones locks
-        pb[master_name].lock_scale = True,False,True
+        pb_master = pb[master_name]
+        pb_master.lock_scale = True,False,True
         
         pb[tip_name].lock_scale    = True,True,True
         pb[tip_name].lock_rotation = True,True,True
         
+        pb_master['finger_curve'] = 1.0
+        prop = rna_idprop_ui_prop_get(pb_master, 'finger_curve')
+        prop["min"] = 0.0
+        prop["max"] = 1.0
+        prop["soft_min"] = 0.0
+        prop["soft_max"] = 1.0
+        prop["description"] = "Rubber hose finger cartoon effect"
+
         # Pose settings
         for org, ctrl, deform, mch, mch_drv in zip(self.org_bones, ctrl_chain, def_chain, mch_chain, mch_drv_chain):
             
@@ -138,21 +157,30 @@ class Rig:
             con.subtarget = ctrl
 
             # Constraining the deform bones
-            if def_chain.index(deform) == 0:
-                con           = pb[deform].constraints.new('COPY_LOCATION')
-                con.target    = self.obj
-                con.subtarget = master_name
-                
-                con           = pb[deform].constraints.new('DAMPED_TRACK')
-                con.target    = self.obj
-                con.subtarget = ctrl_chain[ctrl_chain.index(ctrl)+1]
-            else:
-                con           = pb[deform].constraints.new('COPY_TRANSFORMS')
-                con.target    = self.obj
-                con.subtarget = mch
+            con           = pb[deform].constraints.new('COPY_TRANSFORMS')
+            con.target    = self.obj
+            con.subtarget = mch
             
             # Constraining the mch bones
-            if mch_chain.index(mch) == len(mch_chain) - 1:
+            if mch_chain.index(mch) == 0:
+                con           = pb[mch].constraints.new('COPY_LOCATION')
+                con.target    = self.obj
+                con.subtarget = ctrl
+                
+                con           = pb[mch].constraints.new('COPY_SCALE')
+                con.target    = self.obj
+                con.subtarget = ctrl
+                
+                con           = pb[mch].constraints.new('DAMPED_TRACK')
+                con.target    = self.obj
+                con.subtarget = ctrl_chain[ctrl_chain.index(ctrl)+1]
+                
+                con           = pb[mch].constraints.new('STRETCH_TO')
+                con.target    = self.obj
+                con.subtarget = ctrl_chain[ctrl_chain.index(ctrl)+1]
+                con.volume    = 'NO_VOLUME'
+            
+            elif mch_chain.index(mch) == len(mch_chain) - 1:
                 con           = pb[mch].constraints.new('DAMPED_TRACK')
                 con.target    = self.obj
                 con.subtarget = tip_name
@@ -194,6 +222,33 @@ class Rig:
                 drv_var.type                 = "SINGLE_PROP"
                 drv_var.targets[0].id        = self.obj
                 drv_var.targets[0].data_path = pb[master_name].path_from_id() + '.scale.y'
+                
+            # Setting bone curvature setting, costum property, and drivers
+            def_bone = self.obj.data.bones[deform]
+
+            def_bone.bbone_segments = 8
+            drv = def_bone.driver_add("bbone_in").driver # Ease in
+
+            drv.type='SUM'
+            drv_var = drv.variables.new()
+            drv_var.name = "curvature"
+            drv_var.type = "SINGLE_PROP"
+            drv_var.targets[0].id = self.obj
+            drv_var.targets[0].data_path = pb_master.path_from_id() + '["finger_curve"]'
+            
+            drv = def_bone.driver_add("bbone_out").driver # Ease out
+
+            drv.type='SUM'
+            drv_var = drv.variables.new()
+            drv_var.name = "curvature"
+            drv_var.type = "SINGLE_PROP"
+            drv_var.targets[0].id = self.obj
+            drv_var.targets[0].data_path = pb_master.path_from_id() + '["finger_curve"]'
+
             
             # Assigning shapes to control bones
             create_circle_widget(self.obj, ctrl, radius=0.3, head_tail=0.5)
+            
+            controls_string = ", ".join(["'" + x + "'" for x in ctrl_chain])
+            return [script % (controls_string)]
+            
