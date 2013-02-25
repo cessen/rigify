@@ -17,89 +17,89 @@ class Rig:
             raise MetarigError("RIGIFY ERROR: Bone '%s': listen bro, that finger rig jusaint put tugetha rite. A little hint, use more than one bone!!" % (strip_org(bone_name)))            
 
     def generate(self):
-
         bpy.ops.object.mode_set(mode ='EDIT')
+        eb = self.obj.data.edit_bones
         
-        # Create the deformation and control bone chains.
-        # Just copies of the original chain.
-        def_chain     = []
+        # Bone name lists
         ctrl_chain    = []
+        def_chain     = []
         mch_chain     = []
         mch_drv_chain = []
         
+        # Create ctrl master bone
         org_name  = self.org_bones[0]
         temp_name = strip_org(self.org_bones[0])
         
         master_name = temp_name + "_master"
         ctrl_bone_master = self.obj.data.edit_bones.new(master_name)
-        ctrl_bone_master.head[:] = self.obj.data.edit_bones[org_name].head
-        ctrl_bone_master.tail[:] = self.obj.data.edit_bones[self.org_bones[-1]].tail
-        ctrl_bone_master.roll    = self.obj.data.edit_bones[org_name].roll
-        ctrl_bone_master.parent  = self.obj.data.edit_bones[org_name].parent
+        ctrl_bone_master.head[:] = eb[org_name].head
+        ctrl_bone_master.tail[:] = eb[self.org_bones[-1]].tail
+        ctrl_bone_master.roll    = eb[org_name].roll
+        ctrl_bone_master.parent  = eb[org_name].parent
         
+        # Creating the bone chains
         for i in range(len(self.org_bones)):
-            eb = self.obj.data.edit_bones
-
-            for name in eb:
-                print( name.name )
-
-            print( len( eb ))
-
-            name = self.org_bones[i]
-
-            # Create control and deformation bones
-            temp_name    = strip_org(name)
-            print( i, " base: ", temp_name )
-            print( len( eb ))
-            ctrl_bone    = copy_bone(self.obj, name, temp_name)
-            print( i, " ctrl bone: ", ctrl_bone )
-            print( len( eb ))
-            mch_bone     = copy_bone(self.obj, name, make_mechanism_name(temp_name))
-            print( i, " mch bone: ", mch_bone )
-            print( len( eb ))
-            def_bone     = copy_bone(self.obj, name, make_deformer_name(temp_name))
-            print( i, " def bone: ", def_bone )
-            print( len( eb ))
-            mch_bone_drv = copy_bone(self.obj, name, mch_bone + "_drv")
-            print( i, " drv bone: ", mch_bone_drv )
-            print( len( eb ))
-                        
-            ctrl_bone_e     = eb[ctrl_bone]
-            print( len( eb ))
-            mch_bone_e      = eb[mch_bone]
-            print( len( eb ))
-            def_bone_e      = eb[def_bone]
-            print( len( eb ))
-            mch_bone_drv_e  = eb[mch_bone_drv]
-            print( len( eb ))
-
-            # Add to list
-            ctrl_chain    += [ctrl_bone]
-            def_chain     += [def_bone]
-            mch_chain     += [mch_bone]
-            mch_drv_chain += [mch_bone_drv]
             
-            # Parenting
+            name      = self.org_bones[i]
+            ctrl_name = strip_org(name)
+            
+            # Create control bones
+            ctrl_bone   = copy_bone(self.obj, name, ctrl_name )
+            ctrl_bone_e = eb[ctrl_name]
+            
+            # Create deformation bones
+            def_name  = make_deformer_name(ctrl_name)
+            def_bone  = copy_bone(self.obj, name, def_name )
+
+            # Create mechanism bones
+            mch_name  = make_mechanism_name(ctrl_name)
+            mch_bone  = copy_bone(self.obj, name, mch_name )
+            
+            # Create mechanism driver bones
+            drv_name  = make_mechanism_name(ctrl_name) + "_drv"
+            mch_bone_drv    = copy_bone(self.obj, name, drv_name)
+            mch_bone_drv_e  = eb[drv_name]
+            
+            # Adding to lists
+            ctrl_chain    += [ctrl_name]
+            def_chain     += [def_bone] 
+            mch_chain     += [mch_bone]
+            mch_drv_chain += [drv_name]
+        
+        # Clear initial parenting
+        for b in eb:
+            if b not in self.org_bones:
+                b.parent = None
+        
+        # Parenting chain bones
+        for i in range(len(self.org_bones)):
+            # Edit bone references
+            def_bone_e     = eb[def_chain[i]]
+            ctrl_bone_e    = eb[ctrl_chain[i]]
+            mch_bone_e     = eb[mch_chain[i]]
+            mch_drv_bone_e = eb[mch_drv_chain[i]]
+            
             if i == 0:
                 # First ctl bone
-                ctrl_bone_e.parent    = mch_bone_drv_e
+                ctrl_bone_e.parent      = mch_bone_drv_e
+                ctrl_bone_e.use_connect = False
                 # First def bone
-                def_bone_e.parent     = eb[self.org_bones[0]].parent
+                def_bone_e.parent       = eb[self.org_bones[i]].parent
+                def_bone_e.use_connect  = False
                 # First mch driver bone
-                mch_bone_drv_e.parent = eb[self.org_bones[0]].parent
+                mch_bone_drv_e.parent = eb[self.org_bones[i]].parent
+                mch_bone_drv_e.use_connect  = False
             else:
                 # The rest
                 ctrl_bone_e.parent         = mch_bone_drv_e
-                ctrl_bone_e.use_connect    = False  
+                ctrl_bone_e.use_connect    = False 
                 
-                def_bone_e.parent          = eb[def_chain[-1]]
+                def_bone_e.parent          = eb[def_chain[i-1]]
                 def_bone_e.use_connect     = True
-                
-                mch_bone_drv_e.parent      = eb[ctrl_chain[-1]]
+
+                mch_bone_drv_e.parent      = eb[ctrl_chain[i-1]]
                 mch_bone_drv_e.use_connect = False
 
-
-                
             # Parenting mch bone
             mch_bone_e.parent = ctrl_bone_e
             mch_bone_e.use_connect = False
@@ -107,19 +107,16 @@ class Rig:
         # Creating last conrtol bone 
         ctrl_bone_last = self.obj.data.edit_bones.new(temp_name)
         ctrl_bone_last.head[:] = eb[ctrl_chain[-1]].tail
-        tail_vec = Vector((0, 0.01, 0)) * self.obj.matrix_world
+        tail_vec = Vector((0, 0.1, 0)) * self.obj.matrix_world
         ctrl_bone_last.tail[:] = eb[ctrl_chain[-1]].tail + tail_vec
         ctrl_bone_last.roll    = eb[ctrl_chain[-1]].roll
         ctrl_bone_last.parent  = eb[ctrl_chain[-1]]
 
-        print( "After" )
-        for name in eb:
-            print( name )
 
         bpy.ops.object.mode_set(mode ='OBJECT')
         
         pb = self.obj.pose.bones
-        
+       
         # Pose settings
         for org, ctrl, deform, mch, mch_drv in zip(self.org_bones, ctrl_chain, def_chain, mch_chain, mch_drv_chain):
             
