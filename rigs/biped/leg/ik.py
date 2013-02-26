@@ -27,60 +27,11 @@ from mathutils import Vector
 from .. import limb_common
 
 from ....utils import MetarigError
+from ....utils import align_bone_x_axis
 from ....utils import copy_bone, flip_bone, put_bone
 from ....utils import connected_children_names, has_connected_children
 from ....utils import strip_org, make_mechanism_name, insert_before_lr
 from ....utils import create_widget, create_line_widget, create_sphere_widget, create_circle_widget
-
-
-def align_x_axis(obj, bone, vec):
-    """ Aligns the x-axis of a bone to the given vector.  This only works if it
-        can be an exact match.
-        Must be in edit mode.
-
-    """
-    vec.normalize()
-    bone_e = obj.data.edit_bones[bone]
-    dot = max(-1.0, min(1.0, bone_e.x_axis.dot(vec)))
-    angle = acos(dot)
-
-    bone_e.roll += angle
-
-    dot1 = bone_e.x_axis.dot(vec)
-
-    bone_e.roll -= angle * 2
-
-    dot2 = bone_e.x_axis.dot(vec)
-
-    if dot1 > dot2:
-        bone_e.roll += angle * 2
-
-
-def angle_on_plane(plane, vec1, vec2):
-    """ Return the angle between two vectors projected onto a plane.
-    """
-    plane.normalize()
-    vec1 = vec1 - (plane * (vec1.dot(plane)))
-    vec2 = vec2 - (plane * (vec2.dot(plane)))
-    vec1.normalize()
-    vec2.normalize()
-
-    # Determine the angle
-    angle = acos(max(-1.0, min(1.0, vec1.dot(vec2))))
-
-    if angle < 0.00001:  # close enough to zero that sign doesn't matter
-        return angle
-
-    # Determine the sign of the angle
-    vec3 = vec2.cross(vec1)
-    vec3.normalize()
-    sign = vec3.dot(plane)
-    if sign >= 0:
-        sign = 1
-    else:
-        sign = -1
-
-    return angle * sign
 
 
 class Rig:
@@ -135,15 +86,15 @@ class Rig:
 
         # Get rig parameters
         if params.separate_ik_layers:
-            layers = list(params.ik_layers)
+            self.layers = list(params.ik_layers)
         else:
-            layers = None
+            self.layers = None
         bend_hint = params.bend_hint
         primary_rotation_axis = params.primary_rotation_axis
         pole_target_base_name = self.params.elbow_target_base_name
         
         # Leg is based on common limb
-        self.ik_limb = limb_common.IKLimb(obj, self.org_bones[0], self.org_bones[1], self.org_bones[2], pole_target_base_name, primary_rotation_axis, bend_hint, layers, ikfk_switch)
+        self.ik_limb = limb_common.IKLimb(obj, self.org_bones[0], self.org_bones[1], self.org_bones[2], pole_target_base_name, primary_rotation_axis, bend_hint, self.layers, ikfk_switch)
 
 
     def generate(self):
@@ -251,8 +202,8 @@ class Rig:
         foot_roll_e.length /= 2
 
         roll_axis = roll1_e.vector.cross(org_foot_e.vector)
-        align_x_axis(self.obj, roll1, roll_axis)
-        align_x_axis(self.obj, roll2, roll_axis)
+        align_bone_x_axis(self.obj, roll1, roll_axis)
+        align_bone_x_axis(self.obj, roll2, roll_axis)
         foot_roll_e.roll = roll2_e.roll
 
         if make_rocker:
@@ -369,6 +320,11 @@ class Rig:
         con.name = "copy_transforms"
         con.target = self.obj
         con.subtarget = toe
+        
+        # Set layers if specified
+        if self.layers:
+            foot_roll_p.bone.layers = self.layers
+            toe_p.bone.layers = [(i[0] or i[1]) for i in zip(toe_p.bone.layers, self.layers)]  # Both FK and IK layers
         
         # Create widgets
         create_circle_widget(self.obj, toe, radius=0.7, head_tail=0.5)

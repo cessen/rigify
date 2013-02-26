@@ -482,6 +482,29 @@ def align_bone_roll(obj, bone1, bone2):
         bone1_e.roll = -roll
 
 
+def align_bone_x_axis(obj, bone, vec):
+    """ Aligns the x-axis of a bone to the given vector.  This only works if it
+        can be an exact match.
+        Must be in edit mode.
+
+    """
+    vec.normalize()
+    bone_e = obj.data.edit_bones[bone]
+    dot = max(-1.0, min(1.0, bone_e.x_axis.dot(vec)))
+    angle = math.acos(dot)
+
+    bone_e.roll += angle
+
+    dot1 = bone_e.x_axis.dot(vec)
+
+    bone_e.roll -= angle * 2
+
+    dot2 = bone_e.x_axis.dot(vec)
+
+    if dot1 > dot2:
+        bone_e.roll += angle * 2
+
+
 #=============================================
 # Misc
 #=============================================
