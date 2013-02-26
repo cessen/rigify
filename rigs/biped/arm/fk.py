@@ -63,10 +63,10 @@ class Rig:
             The main armature should be selected and active before this is called.
 
         """
-        ctrl_bones = self.fk_limb.generate()
-        uarm = ctrl_bones[0]
-        farm = ctrl_bones[1]
-        hand = ctrl_bones[2]
+        bone_list = self.fk_limb.generate()
+        uarm = bone_list[0]
+        farm = bone_list[1]
+        hand = bone_list[2]
 
         # Create control widgets
         create_limb_widget(self.obj, uarm)

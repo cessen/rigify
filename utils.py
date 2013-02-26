@@ -21,6 +21,7 @@
 import bpy
 import imp
 import importlib
+import math
 import random
 import time
 from mathutils import Vector
@@ -403,6 +404,37 @@ def create_root_widget(rig, bone_name, bone_transform_name=None):
         mesh = obj.data
         mesh.from_pydata(verts, edges, [])
         mesh.update()
+
+
+#=============================================
+# Math
+#=============================================
+
+def angle_on_plane(plane, vec1, vec2):
+    """ Return the angle between two vectors projected onto a plane.
+    """
+    plane.normalize()
+    vec1 = vec1 - (plane * (vec1.dot(plane)))
+    vec2 = vec2 - (plane * (vec2.dot(plane)))
+    vec1.normalize()
+    vec2.normalize()
+
+    # Determine the angle
+    angle = math.acos(max(-1.0, min(1.0, vec1.dot(vec2))))
+
+    if angle < 0.00001:  # close enough to zero that sign doesn't matter
+        return angle
+
+    # Determine the sign of the angle
+    vec3 = vec2.cross(vec1)
+    vec3.normalize()
+    sign = vec3.dot(plane)
+    if sign >= 0:
+        sign = 1
+    else:
+        sign = -1
+
+    return angle * sign
 
 
 #=============================================
