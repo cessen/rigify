@@ -24,7 +24,7 @@ import importlib
 import math
 import random
 import time
-from mathutils import Vector
+from mathutils import Vector, Matrix
 from rna_prop_ui import rna_idprop_ui_prop_get
 
 RIG_DIR = "rigs"  # Name of the directory where rig types are kept
@@ -435,6 +435,51 @@ def angle_on_plane(plane, vec1, vec2):
         sign = -1
 
     return angle * sign
+
+
+def align_bone_roll(obj, bone1, bone2):
+    """ Aligns the roll of two bones.
+    """
+    bone1_e = obj.data.edit_bones[bone1]
+    bone2_e = obj.data.edit_bones[bone2]
+
+    bone1_e.roll = 0.0
+
+    # Get the directions the bones are pointing in, as vectors
+    y1 = bone1_e.y_axis
+    x1 = bone1_e.x_axis
+    y2 = bone2_e.y_axis
+    x2 = bone2_e.x_axis
+
+    # Get the shortest axis to rotate bone1 on to point in the same direction as bone2
+    axis = y1.cross(y2)
+    axis.normalize()
+
+    # Angle to rotate on that shortest axis
+    angle = y1.angle(y2)
+
+    # Create rotation matrix to make bone1 point in the same direction as bone2
+    rot_mat = Matrix.Rotation(angle, 3, axis)
+
+    # Roll factor
+    x3 = rot_mat * x1
+    dot = x2 * x3
+    if dot > 1.0:
+        dot = 1.0
+    elif dot < -1.0:
+        dot = -1.0
+    roll = math.acos(dot)
+
+    # Set the roll
+    bone1_e.roll = roll
+
+    # Check if we rolled in the right direction
+    x3 = rot_mat * bone1_e.x_axis
+    check = x2 * x3
+
+    # If not, reverse
+    if check < 0.9999:
+        bone1_e.roll = -roll
 
 
 #=============================================
