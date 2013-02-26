@@ -228,7 +228,7 @@ def put_bone(obj, bone_name, pos):
     """ Places a bone at the given position.
     """
     if bone_name not in obj.data.bones:
-        raise MetarigError("put_bone(): bone '%s' not found, cannot copy it" % bone_name)
+        raise MetarigError("put_bone(): bone '%s' not found, cannot move it" % bone_name)
 
     if obj == bpy.context.active_object and bpy.context.mode == 'EDIT_ARMATURE':
         bone = obj.data.edit_bones[bone_name]
@@ -238,6 +238,68 @@ def put_bone(obj, bone_name, pos):
     else:
         raise MetarigError("Cannot 'put' bones outside of edit mode")
 
+
+def make_nonscaling_child(obj, bone_name, location, child_name_postfix=""):
+    """ Takes the named bone and creates a non-scaling child of it at
+        the given location.  The returned bone (returned by name) is not
+        a true child, but behaves like one sans inheriting scaling.
+        
+        It is intended as an intermediate construction to prevent rig types
+        from scaling with their parents.  The named bone is assumed to be
+        an ORG bone.
+    """
+    if bone_name not in obj.data.bones:
+        raise MetarigError("make_nonscaling_child(): bone '%s' not found, cannot copy it" % bone_name)
+        
+    if obj == bpy.context.active_object and bpy.context.mode == 'EDIT_ARMATURE':
+        # Create desired names for bones
+        name1 = make_mechanism_name(strip_org(insert_before_lr(bone_name, child_name_postfix + "_ns_ch")))
+        name2 = make_mechanism_name(strip_org(insert_before_lr(bone_name, child_name_postfix + "_ns_intr")))
+        
+        # Create bones
+        child = copy_bone(obj, bone_name, name1)
+        intermediate_parent = copy_bone(obj, bone_name, name2)
+        
+        # Get edit bones
+        eb = obj.data.edit_bones
+        child_e = eb[child]
+        intrpar_e = eb[intermediate_parent]
+        
+        # Parenting
+        child_e.use_connect = False
+        child_e.parent = None
+        
+        intrpar_e.use_connect = False
+        intrpar_e.parent = eb[bone_name]
+        
+        # Positioning
+        child_e.length *= 0.5
+        intrpar_e.length *= 0.25
+        
+        put_bone(obj, child, location)
+        put_bone(obj, intermediate_parent, location)
+        
+        # Object mode
+        bpy.ops.object.mode_set(mode='OBJECT')
+        pb = obj.pose.bones
+        
+        # Add constraints
+        con = pb[child].constraints.new('COPY_LOCATION')
+        con.name = "parent_loc"
+        con.target = obj
+        con.subtarget = intermediate_parent
+        
+        con = pb[child].constraints.new('COPY_ROTATION')
+        con.name = "parent_loc"
+        con.target = obj
+        con.subtarget = intermediate_parent
+        
+        bpy.ops.object.mode_set(mode='EDIT')
+        
+        return child
+    else:
+        raise MetarigError("Cannot make nonscaling child outside of edit mode")
+    
 
 #=============================================
 # Widget creation

@@ -24,11 +24,10 @@ from mathutils import Vector
 
 from ...utils import MetarigError
 from ...utils import angle_on_plane, align_bone_roll
-from ...utils import copy_bone, put_bone
+from ...utils import copy_bone, put_bone, make_nonscaling_child
 from ...utils import strip_org, make_mechanism_name, make_deformer_name, insert_before_lr
 from ...utils import get_layers
 from ...utils import create_widget, create_limb_widget, create_line_widget, create_sphere_widget, create_circle_widget
-
 
 
 class FKLimb:
@@ -49,6 +48,13 @@ class FKLimb:
 
     def generate(self):
         bpy.ops.object.mode_set(mode='EDIT')
+        
+        # Create non-scaling parent bone
+        if self.org_parent != None:
+            loc = Vector(self.obj.data.edit_bones[self.org_bones[0]].head)
+            parent = make_nonscaling_child(self.obj, self.org_parent, loc, "_fk")
+        else:
+            parent = None
 
         # Create the control bones
         ulimb = copy_bone(self.obj, self.org_bones[0], strip_org(insert_before_lr(self.org_bones[0], ".fk")))
@@ -59,8 +65,7 @@ class FKLimb:
         elimb_mch = copy_bone(self.obj, self.org_bones[2], make_mechanism_name(strip_org(self.org_bones[2])))
 
         # Create the hinge bones
-        if self.org_parent != None:
-            hinge = copy_bone(self.obj, self.org_parent, make_mechanism_name(ulimb + ".hinge"))
+        if parent != None:
             socket1 = copy_bone(self.obj, ulimb, make_mechanism_name(ulimb + ".socket1"))
             socket2 = copy_bone(self.obj, ulimb, make_mechanism_name(ulimb + ".socket2"))
 
@@ -72,8 +77,7 @@ class FKLimb:
         elimb_e = eb[elimb]
         elimb_mch_e = eb[elimb_mch]
 
-        if self.org_parent != None:
-            hinge_e = eb[hinge]
+        if parent != None:
             socket1_e = eb[socket1]
             socket2_e = eb[socket2]
 
@@ -84,19 +88,19 @@ class FKLimb:
         elimb_mch_e.use_connect = False
         elimb_mch_e.parent = elimb_e
 
-        if self.org_parent != None:
-            hinge_e.use_connect = False
+        if parent != None:
             socket1_e.use_connect = False
+            socket1_e.parent = eb[parent]
+            
             socket2_e.use_connect = False
-
-            ulimb_e.parent = hinge_e
-            hinge_e.parent = socket2_e
             socket2_e.parent = None
+            
+            ulimb_e.use_connect = False
+            ulimb_e.parent = socket2_e
+            
 
         # Positioning
-        if self.org_parent != None:
-            center = (hinge_e.head + hinge_e.tail) / 2
-            hinge_e.head = center
+        if parent != None:
             socket1_e.length /= 4
             socket2_e.length /= 3
 
@@ -108,11 +112,8 @@ class FKLimb:
         flimb_p = pb[flimb]
         elimb_p = pb[elimb]
         elimb_mch_p = pb[elimb_mch]
-        
-        if self.org_parent != None:
-            hinge_p = pb[hinge]
 
-        if self.org_parent != None:
+        if parent != None:
             socket2_p = pb[socket2]
 
         # Set the elbow to only bend on the x-axis.
@@ -124,22 +125,15 @@ class FKLimb:
         else:
             flimb_p.lock_rotation = (True, True, False)
 
-        # Hinge transforms are locked, for auto-ik
-        if self.org_parent != None:
-            hinge_p.lock_location = True, True, True
-            hinge_p.lock_rotation = True, True, True
-            hinge_p.lock_rotation_w = True
-            hinge_p.lock_scale = True, True, True
-
         # Set up custom properties
-        if self.org_parent != None:
+        if parent != None:
             prop = rna_idprop_ui_prop_get(ulimb_p, "isolate", create=True)
             ulimb_p["isolate"] = 0.0
             prop["soft_min"] = prop["min"] = 0.0
             prop["soft_max"] = prop["max"] = 1.0
 
         # Hinge constraints / drivers
-        if self.org_parent != None:
+        if parent != None:
             con = socket2_p.constraints.new('COPY_LOCATION')
             con.name = "copy_location"
             con.target = self.obj
@@ -215,6 +209,12 @@ class IKLimb:
         # Get the chain of 3 connected bones
         self.org_bones = [bone1, bone2, bone3]
 
+        # Get (optional) parent
+        if self.obj.data.bones[bone1].parent is None:
+            self.org_parent = None
+        else:
+            self.org_parent = self.obj.data.bones[bone1].parent.name
+
         # Get the rig parameters
         self.pole_target_base_name = pole_target_base_name
         self.layers = layers
@@ -223,6 +223,13 @@ class IKLimb:
 
     def generate(self):
         bpy.ops.object.mode_set(mode='EDIT')
+
+        # Create non-scaling parent bone
+        if self.org_parent != None:
+            loc = Vector(self.obj.data.edit_bones[self.org_bones[0]].head)
+            parent = make_nonscaling_child(self.obj, self.org_parent, loc, "_ik")
+        else:
+            parent = None
 
         # Create the bones
         ulimb = copy_bone(self.obj, self.org_bones[0], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[0], ".ik"))))
@@ -239,6 +246,8 @@ class IKLimb:
         # Get edit bones
         eb = self.obj.data.edit_bones
 
+        if parent != None:
+            parent_e = eb[parent]
         ulimb_e = eb[ulimb]
         flimb_e = eb[flimb]
         elimb_e = eb[elimb]
@@ -248,6 +257,10 @@ class IKLimb:
         vispole_e = eb[vispole]
 
         # Parenting
+        ulimb_e.use_connect = False
+        if parent != None:
+            ulimb_e.parent = parent_e
+        
         flimb_e.parent = ulimb_e
 
         elimb_e.use_connect = False
@@ -257,6 +270,8 @@ class IKLimb:
         elimb_mch_e.parent = elimb_e
 
         pole_e.use_connect = False
+        if parent != None:
+            pole_e.parent = parent_e
 
         viselimb_e.use_connect = False
         viselimb_e.parent = None
@@ -478,12 +493,25 @@ class RubberHoseLimb:
         # Get the chain of 3 connected bones
         self.org_bones = [bone1, bone2, bone3]
 
+        # Get (optional) parent
+        if self.obj.data.bones[bone1].parent is None:
+            self.org_parent = None
+        else:
+            self.org_parent = self.obj.data.bones[bone1].parent.name
+
         # Get rig parameters
         self.use_upper_limb_twist = use_upper_limb_twist
         self.use_lower_limb_twist = use_lower_limb_twist
 
     def generate(self):
         bpy.ops.object.mode_set(mode='EDIT')
+
+        # Create non-scaling parent bone
+        if self.org_parent != None:
+            loc = Vector(self.obj.data.edit_bones[self.org_bones[0]].head)
+            parent = make_nonscaling_child(self.obj, self.org_parent, loc, "_rh")
+        else:
+            parent = None
 
         # Create upper limb bones
         if self.use_upper_limb_twist:
@@ -506,6 +534,9 @@ class RubberHoseLimb:
 
         # Get edit bones
         eb = self.obj.data.edit_bones
+
+        if parent != None:
+            parent_e = eb[parent]
 
         org_ulimb_e = eb[self.org_bones[0]]
         if self.use_upper_limb_twist:
@@ -532,7 +563,8 @@ class RubberHoseLimb:
             ulimb2_e.use_connect = False
             utip_e.use_connect = False
 
-            ulimb1_e.parent = org_ulimb_e.parent
+            if parent != None:
+                ulimb1_e.parent = parent_e
             ulimb2_e.parent = org_ulimb_e
             utip_e.parent = org_ulimb_e
 
