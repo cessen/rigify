@@ -35,13 +35,6 @@ class Rig:
 
     """
     def __init__(self, obj, bone, params):
-        """ Gather and validate data about the rig.
-            Store any data or references to data that will be needed later on.
-            In particular, store references to bones that will be needed, and
-            store names of bones that will be needed.
-            Do NOT change any data in the scene.  This is a gathering phase only.
-
-        """
         self.obj = obj
         self.params = params
 
@@ -59,9 +52,4 @@ class Rig:
         self.rubber_hose_limb = limb_common.RubberHoseLimb(obj, self.org_bones[0], self.org_bones[1], self.org_bones[2], use_upper_arm_twist, use_forearm_twist)
 
     def generate(self):
-        """ Generate the rig.
-            Do NOT modify any of the original bones, except for adding constraints.
-            The main armature should be selected and active before this is called.
-
-        """
         self.rubber_hose_limb.generate()
