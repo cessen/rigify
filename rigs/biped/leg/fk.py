@@ -117,10 +117,7 @@ class Rig:
         foot_e.roll = eb[self.org_bones[3]].roll
         bpy.ops.object.mode_set(mode='OBJECT')
 
-        # Create control widgets
-        create_limb_widget(self.obj, thigh)
-        create_limb_widget(self.obj, shin)
-
+        # Create foot widget
         ob = create_widget(self.obj, foot)
         if ob != None:
             verts = [(0.7, 1.5, 0.0), (0.7, -0.25, 0.0), (-0.7, -0.25, 0.0), (-0.7, 1.5, 0.0), (0.7, 0.723, 0.0), (-0.7, 0.723, 0.0), (0.7, 0.0, 0.0), (-0.7, 0.0, 0.0)]

@@ -67,11 +67,8 @@ class Rig:
         uarm = bone_list[0]
         farm = bone_list[1]
         hand = bone_list[2]
-
-        # Create control widgets
-        create_limb_widget(self.obj, uarm)
-        create_limb_widget(self.obj, farm)
-
+        
+        # Create hand widget
         ob = create_widget(self.obj, hand)
         if ob != None:
             verts = [(0.7, 1.5, 0.0), (0.7, -0.25, 0.0), (-0.7, -0.25, 0.0), (-0.7, 1.5, 0.0), (0.7, 0.723, 0.0), (-0.7, 0.723, 0.0), (0.7, 0.0, 0.0), (-0.7, 0.0, 0.0)]

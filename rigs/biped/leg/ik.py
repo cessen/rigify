@@ -24,6 +24,8 @@ import bpy
 from rna_prop_ui import rna_idprop_ui_prop_get
 from mathutils import Vector
 
+from .. import limb_common
+
 from ....utils import MetarigError
 from ....utils import copy_bone, flip_bone, put_bone
 from ....utils import connected_children_names, has_connected_children
@@ -133,35 +135,39 @@ class Rig:
 
         # Get rig parameters
         if params.separate_ik_layers:
-            self.layers = list(params.ik_layers)
+            layers = list(params.ik_layers)
         else:
-            self.layers = None
+            layers = None
+        bend_hint = params.bend_hint
+        primary_rotation_axis = params.primary_rotation_axis
+        pole_target_base_name = self.params.elbow_target_base_name
+        
+        # Leg is based on common limb
+        self.ik_limb = limb_common.IKLimb(obj, self.org_bones[0], self.org_bones[1], self.org_bones[2], pole_target_base_name, primary_rotation_axis, bend_hint, layers, ikfk_switch)
 
-        self.bend_hint = params.bend_hint
-
-        self.primary_rotation_axis = params.primary_rotation_axis
 
     def generate(self):
         """ Generate the rig.
             Do NOT modify any of the original bones, except for adding constraints.
             The main armature should be selected and active before this is called.
-
         """
+        # Generate base IK limb
+        bone_list = self.ik_limb.generate()
+        thigh = bone_list[0]
+        shin = bone_list[1]
+        foot = bone_list[2]
+        foot_mch = bone_list[3]
+        pole = bone_list[4]
+        vispole = bone_list[5]
+        visfoot = bone_list[6]
+        
+        # Build IK foot rig
         bpy.ops.object.mode_set(mode='EDIT')
-
         make_rocker = False
         if self.org_bones[5] is not None:
             make_rocker = True
-
+            
         # Create the bones
-        thigh = copy_bone(self.obj, self.org_bones[0], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[0], ".ik"))))
-        shin = copy_bone(self.obj, self.org_bones[1], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[1], ".ik"))))
-
-        foot = copy_bone(self.obj, self.org_bones[2], strip_org(insert_before_lr(self.org_bones[2], ".ik")))
-        foot_ik_target = copy_bone(self.obj, self.org_bones[2], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[2], "_ik_target"))))
-        pole_target_name = self.params.knee_target_base_name + "." + insert_before_lr(self.org_bones[0], ".ik").split(".", 1)[1]
-        pole = copy_bone(self.obj, self.org_bones[0], pole_target_name)
-
         toe = copy_bone(self.obj, self.org_bones[3], strip_org(self.org_bones[3]))
         toe_parent = copy_bone(self.obj, self.org_bones[2], make_mechanism_name(strip_org(self.org_bones[3] + ".parent")))
         toe_parent_socket1 = copy_bone(self.obj, self.org_bones[2], make_mechanism_name(strip_org(self.org_bones[3] + ".socket1")))
@@ -175,18 +181,12 @@ class Rig:
             rocker1 = copy_bone(self.obj, self.org_bones[5], make_mechanism_name(strip_org(self.org_bones[2] + ".rocker.01")))
             rocker2 = copy_bone(self.obj, self.org_bones[5], make_mechanism_name(strip_org(self.org_bones[2] + ".rocker.02")))
 
-        visfoot = copy_bone(self.obj, self.org_bones[2], "VIS-" + strip_org(insert_before_lr(self.org_bones[2], ".ik")))
-        vispole = copy_bone(self.obj, self.org_bones[1], "VIS-" + strip_org(insert_before_lr(self.org_bones[0], "_pole.ik")))
-
         # Get edit bones
         eb = self.obj.data.edit_bones
 
         org_foot_e = eb[self.org_bones[2]]
-        thigh_e = eb[thigh]
-        shin_e = eb[shin]
         foot_e = eb[foot]
-        foot_ik_target_e = eb[foot_ik_target]
-        pole_e = eb[pole]
+        foot_ik_target_e = eb[foot_mch]
         toe_e = eb[toe]
         toe_parent_e = eb[toe_parent]
         toe_parent_socket1_e = eb[toe_parent_socket1]
@@ -197,19 +197,10 @@ class Rig:
         if make_rocker:
             rocker1_e = eb[rocker1]
             rocker2_e = eb[rocker2]
-        visfoot_e = eb[visfoot]
-        vispole_e = eb[vispole]
-
+        
         # Parenting
-        shin_e.parent = thigh_e
-
-        foot_e.use_connect = False
-        foot_e.parent = None
         foot_ik_target_e.use_connect = False
         foot_ik_target_e.parent = roll2_e
-
-        pole_e.use_connect = False
-        pole_e.parent = foot_e
 
         toe_e.parent = toe_parent_e
         toe_parent_e.use_connect = False
@@ -228,12 +219,6 @@ class Rig:
         roll2_e.use_connect = False
         roll2_e.parent = roll1_e
 
-        visfoot_e.use_connect = False
-        visfoot_e.parent = None
-
-        vispole_e.use_connect = False
-        vispole_e.parent = None
-
         if make_rocker:
             rocker1_e.use_connect = False
             rocker2_e.use_connect = False
@@ -241,38 +226,12 @@ class Rig:
             roll1_e.parent = rocker2_e
             rocker2_e.parent = rocker1_e
             rocker1_e.parent = foot_e
-
-        # Misc
-        foot_e.use_local_location = False
-
-        visfoot_e.hide_select = True
-        vispole_e.hide_select = True
-
+            
         # Positioning
         vec = Vector(toe_e.vector)
         vec.normalize()
         foot_e.tail = foot_e.head + (vec * foot_e.length)
         foot_e.roll = toe_e.roll
-
-        v1 = shin_e.tail - thigh_e.head
-
-        if 'X' in self.primary_rotation_axis or 'Y' in self.primary_rotation_axis:
-            v2 = v1.cross(shin_e.x_axis)
-            if (v2 * shin_e.z_axis) > 0.0:
-                v2 *= -1.0
-        else:
-            v2 = v1.cross(shin_e.z_axis)
-            if (v2 * shin_e.x_axis) < 0.0:
-                v2 *= -1.0
-        v2.normalize()
-        v2 *= v1.length
-
-        if '-' in self.primary_rotation_axis:
-            v2 *= -1
-
-        pole_e.head = shin_e.head + v2
-        pole_e.tail = pole_e.head + (Vector((0, 1, 0)) * (v1.length / 8))
-        pole_e.roll = 0.0
 
         flip_bone(self.obj, toe_parent_socket1)
         flip_bone(self.obj, toe_parent_socket2)
@@ -296,9 +255,6 @@ class Rig:
         align_x_axis(self.obj, roll2, roll_axis)
         foot_roll_e.roll = roll2_e.roll
 
-        visfoot_e.tail = visfoot_e.head + Vector((0, 0, v1.length / 32))
-        vispole_e.tail = vispole_e.head + Vector((0, 0, v1.length / 32))
-
         if make_rocker:
             d = toe_e.y_axis.dot(rocker1_e.x_axis)
             if d >= 0.0:
@@ -306,30 +262,11 @@ class Rig:
             else:
                 flip_bone(self.obj, rocker1)
 
-        # Weird alignment issues.  Fix.
-        toe_parent_e.head = Vector(org_foot_e.head)
-        toe_parent_e.tail = Vector(org_foot_e.tail)
-        toe_parent_e.roll = org_foot_e.roll
-
-        foot_e.head = Vector(org_foot_e.head)
-
-        foot_ik_target_e.head = Vector(org_foot_e.head)
-        foot_ik_target_e.tail = Vector(org_foot_e.tail)
-
-        # Determine the pole offset value
-        plane = (shin_e.tail - thigh_e.head).normalized()
-        vec1 = thigh_e.x_axis.normalized()
-        vec2 = (pole_e.head - thigh_e.head).normalized()
-        pole_offset = angle_on_plane(plane, vec1, vec2)
-
         # Object mode, get pose bones
         bpy.ops.object.mode_set(mode='OBJECT')
         pb = self.obj.pose.bones
 
-        # thigh_p = pb[thigh]  # UNUSED
-        shin_p = pb[shin]
         foot_p = pb[foot]
-        pole_p = pb[pole]
         foot_roll_p = pb[foot_roll]
         roll1_p = pb[roll1]
         roll2_p = pb[roll2]
@@ -339,20 +276,7 @@ class Rig:
         toe_p = pb[toe]
         toe_parent_p = pb[toe_parent]
         toe_parent_socket1_p = pb[toe_parent_socket1]
-        visfoot_p = pb[visfoot]
-        vispole_p = pb[vispole]
-
-        # Set the knee to only bend on the primary axis.
-        if 'X' in self.primary_rotation_axis:
-            shin_p.lock_ik_y = True
-            shin_p.lock_ik_z = True
-        elif 'Y' in self.primary_rotation_axis:
-            shin_p.lock_ik_x = True
-            shin_p.lock_ik_z = True
-        else:
-            shin_p.lock_ik_x = True
-            shin_p.lock_ik_y = True
-
+        
         # Foot roll control only rotates on x-axis, or x and y if rocker.
         foot_roll_p.rotation_mode = 'XYZ'
         if make_rocker:
@@ -368,60 +292,7 @@ class Rig:
         if make_rocker:
             rocker1_p.rotation_mode = 'XYZ'
             rocker2_p.rotation_mode = 'XYZ'
-
-        # Pole target only translates
-        pole_p.lock_location = False, False, False
-        pole_p.lock_rotation = True, True, True
-        pole_p.lock_rotation_w = True
-        pole_p.lock_scale = True, True, True
-
-        # Set up custom properties
-        if self.switch is True:
-            prop = rna_idprop_ui_prop_get(foot_p, "ikfk_switch", create=True)
-            foot_p["ikfk_switch"] = 0.0
-            prop["soft_min"] = prop["min"] = 0.0
-            prop["soft_max"] = prop["max"] = 1.0
-
-        # Bend direction hint
-        if self.bend_hint:
-            con = shin_p.constraints.new('LIMIT_ROTATION')
-            con.name = "bend_hint"
-            con.owner_space = 'LOCAL'
-            if self.primary_rotation_axis == 'X':
-                con.use_limit_x = True
-                con.min_x = pi / 10
-                con.max_x = pi / 10
-            elif self.primary_rotation_axis == '-X':
-                con.use_limit_x = True
-                con.min_x = -pi / 10
-                con.max_x = -pi / 10
-            elif self.primary_rotation_axis == 'Y':
-                con.use_limit_y = True
-                con.min_y = pi / 10
-                con.max_y = pi / 10
-            elif self.primary_rotation_axis == '-Y':
-                con.use_limit_y = True
-                con.min_y = -pi / 10
-                con.max_y = -pi / 10
-            elif self.primary_rotation_axis == 'Z':
-                con.use_limit_z = True
-                con.min_z = pi / 10
-                con.max_z = pi / 10
-            elif self.primary_rotation_axis == '-Z':
-                con.use_limit_z = True
-                con.min_z = -pi / 10
-                con.max_z = -pi / 10
-
-        # IK Constraint
-        con = shin_p.constraints.new('IK')
-        con.name = "ik"
-        con.target = self.obj
-        con.subtarget = foot_ik_target
-        con.pole_target = self.obj
-        con.pole_subtarget = pole
-        con.pole_angle = pole_offset
-        con.chain_count = 2
-
+        
         # toe_parent constraint
         con = toe_parent_socket1_p.constraints.new('COPY_LOCATION')
         con.name = "copy_location"
@@ -492,110 +363,15 @@ class Rig:
             var.targets[0].id_type = 'OBJECT'
             var.targets[0].id = self.obj
             var.targets[0].data_path = foot_roll_p.path_from_id() + '.rotation_euler[1]'
-
-        # Constrain org bones to controls
-        con = pb[self.org_bones[0]].constraints.new('COPY_TRANSFORMS')
-        con.name = "ik"
-        con.target = self.obj
-        con.subtarget = thigh
-        if self.switch is True:
-            # IK/FK switch driver
-            fcurve = con.driver_add("influence")
-            driver = fcurve.driver
-            var = driver.variables.new()
-            driver.type = 'AVERAGE'
-            var.name = "var"
-            var.targets[0].id_type = 'OBJECT'
-            var.targets[0].id = self.obj
-            var.targets[0].data_path = foot_p.path_from_id() + '["ikfk_switch"]'
-
-        con = pb[self.org_bones[1]].constraints.new('COPY_TRANSFORMS')
-        con.name = "ik"
-        con.target = self.obj
-        con.subtarget = shin
-        if self.switch is True:
-            # IK/FK switch driver
-            fcurve = con.driver_add("influence")
-            driver = fcurve.driver
-            var = driver.variables.new()
-            driver.type = 'AVERAGE'
-            var.name = "var"
-            var.targets[0].id_type = 'OBJECT'
-            var.targets[0].id = self.obj
-            var.targets[0].data_path = foot_p.path_from_id() + '["ikfk_switch"]'
-
-        con = pb[self.org_bones[2]].constraints.new('COPY_TRANSFORMS')
-        con.name = "ik"
-        con.target = self.obj
-        con.subtarget = foot_ik_target
-        if self.switch is True:
-            # IK/FK switch driver
-            fcurve = con.driver_add("influence")
-            driver = fcurve.driver
-            var = driver.variables.new()
-            driver.type = 'AVERAGE'
-            var.name = "var"
-            var.targets[0].id_type = 'OBJECT'
-            var.targets[0].id = self.obj
-            var.targets[0].data_path = foot_p.path_from_id() + '["ikfk_switch"]'
-
+        
+        # Constrain toe bone to toe control
         con = pb[self.org_bones[3]].constraints.new('COPY_TRANSFORMS')
         con.name = "copy_transforms"
         con.target = self.obj
         con.subtarget = toe
-
-        # VIS foot constraints
-        con = visfoot_p.constraints.new('COPY_LOCATION')
-        con.name = "copy_loc"
-        con.target = self.obj
-        con.subtarget = self.org_bones[2]
-
-        con = visfoot_p.constraints.new('STRETCH_TO')
-        con.name = "stretch_to"
-        con.target = self.obj
-        con.subtarget = foot
-        con.volume = 'NO_VOLUME'
-        con.rest_length = visfoot_p.length
-
-        # VIS pole constraints
-        con = vispole_p.constraints.new('COPY_LOCATION')
-        con.name = "copy_loc"
-        con.target = self.obj
-        con.subtarget = self.org_bones[1]
-
-        con = vispole_p.constraints.new('STRETCH_TO')
-        con.name = "stretch_to"
-        con.target = self.obj
-        con.subtarget = pole
-        con.volume = 'NO_VOLUME'
-        con.rest_length = vispole_p.length
-
-        # Set layers if specified
-        if self.layers:
-            foot_p.bone.layers = self.layers
-            pole_p.bone.layers = self.layers
-            foot_roll_p.bone.layers = self.layers
-            visfoot_p.bone.layers = self.layers
-            vispole_p.bone.layers = self.layers
-
-            toe_p.bone.layers = [(i[0] or i[1]) for i in zip(toe_p.bone.layers, self.layers)]  # Both FK and IK layers
-
+        
         # Create widgets
-        create_line_widget(self.obj, vispole)
-        create_line_widget(self.obj, visfoot)
-        create_sphere_widget(self.obj, pole)
         create_circle_widget(self.obj, toe, radius=0.7, head_tail=0.5)
-
-        ob = create_widget(self.obj, foot)
-        if ob != None:
-            verts = [(0.7, 1.5, 0.0), (0.7, -0.25, 0.0), (-0.7, -0.25, 0.0), (-0.7, 1.5, 0.0), (0.7, 0.723, 0.0), (-0.7, 0.723, 0.0), (0.7, 0.0, 0.0), (-0.7, 0.0, 0.0)]
-            edges = [(1, 2), (0, 3), (0, 4), (3, 5), (4, 6), (1, 6), (5, 7), (2, 7)]
-            mesh = ob.data
-            mesh.from_pydata(verts, edges, [])
-            mesh.update()
-
-            mod = ob.modifiers.new("subsurf", 'SUBSURF')
-            mod.levels = 2
 
         ob = create_widget(self.obj, foot_roll)
         if ob != None:
@@ -607,5 +383,16 @@ class Rig:
 
             mod = ob.modifiers.new("subsurf", 'SUBSURF')
             mod.levels = 2
+            
+        ob = create_widget(self.obj, foot)
+        if ob != None:
+            verts = [(0.7, 1.5, 0.0), (0.7, -0.25, 0.0), (-0.7, -0.25, 0.0), (-0.7, 1.5, 0.0), (0.7, 0.723, 0.0), (-0.7, 0.723, 0.0), (0.7, 0.0, 0.0), (-0.7, 0.0, 0.0)]
+            edges = [(1, 2), (0, 3), (0, 4), (3, 5), (4, 6), (1, 6), (5, 7), (2, 7)]
+            mesh = ob.data
+            mesh.from_pydata(verts, edges, [])
+            mesh.update()
 
-        return [thigh, shin, foot, pole, foot_roll, foot_ik_target]
+            mod = ob.modifiers.new("subsurf", 'SUBSURF')
+            mod.levels = 2
+
+        return [thigh, shin, foot, pole, foot_roll, foot_mch]

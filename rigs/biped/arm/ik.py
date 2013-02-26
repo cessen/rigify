@@ -76,15 +76,11 @@ class Rig:
         uarm = bone_list[0]
         farm = bone_list[1]
         hand = bone_list[2]
-        pole = bone_list[3]
-        vispole = bone_list[4]
-        vishand = bone_list[5]
-
-        # Create widgets
-        create_line_widget(self.obj, vispole)
-        create_line_widget(self.obj, vishand)
-        create_sphere_widget(self.obj, pole)
-
+        hand_mch = bone_list[3]
+        pole = bone_list[4]
+        vispole = bone_list[5]
+        vishand = bone_list[6]
+        
         ob = create_widget(self.obj, hand)
         if ob != None:
             verts = [(0.7, 1.5, 0.0), (0.7, -0.25, 0.0), (-0.7, -0.25, 0.0), (-0.7, 1.5, 0.0), (0.7, 0.723, 0.0), (-0.7, 0.723, 0.0), (0.7, 0.0, 0.0), (-0.7, 0.0, 0.0)]

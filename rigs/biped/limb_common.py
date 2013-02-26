@@ -27,6 +27,8 @@ from ...utils import angle_on_plane
 from ...utils import copy_bone
 from ...utils import strip_org, make_mechanism_name, insert_before_lr
 from ...utils import get_layers
+from ...utils import create_widget, create_limb_widget, create_line_widget, create_sphere_widget, create_circle_widget
+
 
 
 class FKLimb:
@@ -183,6 +185,21 @@ class FKLimb:
             ulimb_p.bone.layers = self.layers
             flimb_p.bone.layers = self.layers
             elimb_p.bone.layers = self.layers
+        
+        # Create control widgets
+        create_limb_widget(self.obj, ulimb)
+        create_limb_widget(self.obj, flimb)
+
+        ob = create_widget(self.obj, elimb)
+        if ob != None:
+            verts = [(0.7, 1.5, 0.0), (0.7, -0.25, 0.0), (-0.7, -0.25, 0.0), (-0.7, 1.5, 0.0), (0.7, 0.723, 0.0), (-0.7, 0.723, 0.0), (0.7, 0.0, 0.0), (-0.7, 0.0, 0.0)]
+            edges = [(1, 2), (0, 3), (0, 4), (3, 5), (4, 6), (1, 6), (5, 7), (2, 7)]
+            mesh = ob.data
+            mesh.from_pydata(verts, edges, [])
+            mesh.update()
+
+            mod = ob.modifiers.new("subsurf", 'SUBSURF')
+            mod.levels = 2
 
         return [ulimb, flimb, elimb, elimb_mch]
 
@@ -192,14 +209,6 @@ class IKLimb:
 
     """
     def __init__(self, obj, bone1, bone2, bone3, pole_target_base_name, primary_rotation_axis, bend_hint, layers, ikfk_switch=False):
-        """ Gather and validate data about the rig.
-            Store any data or references to data that will be needed later on.
-            In particular, store references to bones that will be needed, and
-            store names of bones that will be needed.
-            Do NOT change any data in the scene.  This is a gathering phase only.
-
-            ikfk_switch: if True, create an ik/fk switch slider
-        """
         self.obj = obj
         self.switch = ikfk_switch
 
@@ -213,11 +222,6 @@ class IKLimb:
         self.primary_rotation_axis = primary_rotation_axis
 
     def generate(self):
-        """ Generate the rig.
-            Do NOT modify any of the original bones, except for adding constraints.
-            The main armature should be selected and active before this is called.
-
-        """
         bpy.ops.object.mode_set(mode='EDIT')
 
         # Create the bones
@@ -225,6 +229,7 @@ class IKLimb:
         flimb = copy_bone(self.obj, self.org_bones[1], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[1], ".ik"))))
 
         elimb = copy_bone(self.obj, self.org_bones[2], strip_org(insert_before_lr(self.org_bones[2], ".ik")))
+        elimb_mch = copy_bone(self.obj, self.org_bones[2], make_mechanism_name(strip_org(self.org_bones[2])))
         pole_target_name = self.pole_target_base_name + "." + insert_before_lr(self.org_bones[0], ".ik").split(".", 1)[1]
         pole = copy_bone(self.obj, self.org_bones[0], pole_target_name)
 
@@ -237,6 +242,7 @@ class IKLimb:
         ulimb_e = eb[ulimb]
         flimb_e = eb[flimb]
         elimb_e = eb[elimb]
+        elimb_mch_e = eb[elimb_mch]
         pole_e = eb[pole]
         viselimb_e = eb[viselimb]
         vispole_e = eb[vispole]
@@ -246,6 +252,9 @@ class IKLimb:
 
         elimb_e.use_connect = False
         elimb_e.parent = None
+        
+        elimb_mch_e.use_connect = False
+        elimb_mch_e.parent = elimb_e
 
         pole_e.use_connect = False
 
@@ -294,7 +303,6 @@ class IKLimb:
         bpy.ops.object.mode_set(mode='OBJECT')
         pb = self.obj.pose.bones
 
-        # ulimb_p = pb[ulimb]  # UNUSED
         flimb_p = pb[flimb]
         elimb_p = pb[elimb]
         pole_p = pb[pole]
@@ -359,7 +367,7 @@ class IKLimb:
         con = flimb_p.constraints.new('IK')
         con.name = "ik"
         con.target = self.obj
-        con.subtarget = elimb
+        con.subtarget = elimb_mch
         con.pole_target = self.obj
         con.pole_subtarget = pole
         con.pole_angle = pole_offset
@@ -399,7 +407,7 @@ class IKLimb:
         con = pb[self.org_bones[2]].constraints.new('COPY_TRANSFORMS')
         con.name = "ik"
         con.target = self.obj
-        con.subtarget = elimb
+        con.subtarget = elimb_mch
         if self.switch is True:
             # IK/FK switch driver
             fcurve = con.driver_add("influence")
@@ -444,4 +452,20 @@ class IKLimb:
             viselimb_p.bone.layers = self.layers
             vispole_p.bone.layers = self.layers
 
-        return [ulimb, flimb, elimb, pole, vispole, viselimb]
+        # Create widgets        
+        create_line_widget(self.obj, vispole)
+        create_line_widget(self.obj, viselimb)
+        create_sphere_widget(self.obj, pole)
+        
+        ob = create_widget(self.obj, elimb)
+        if ob != None:
+            verts = [(0.7, 1.5, 0.0), (0.7, -0.25, 0.0), (-0.7, -0.25, 0.0), (-0.7, 1.5, 0.0), (0.7, 0.723, 0.0), (-0.7, 0.723, 0.0), (0.7, 0.0, 0.0), (-0.7, 0.0, 0.0)]
+            edges = [(1, 2), (0, 3), (0, 4), (3, 5), (4, 6), (1, 6), (5, 7), (2, 7)]
+            mesh = ob.data
+            mesh.from_pydata(verts, edges, [])
+            mesh.update()
+
+            mod = ob.modifiers.new("subsurf", 'SUBSURF')
+            mod.levels = 2
+
+        return [ulimb, flimb, elimb, elimb_mch, pole, vispole, viselimb]
