@@ -94,17 +94,20 @@ def add_parameters(params):
         RigifyParameters PropertyGroup
 
     """
+    params.use_complex_arm = bpy.props.BoolProperty(name="Complex Arm Rig", default=True, description="Generate the full, complex arm rig with twist bones and rubber-hose controls")
+    params.bend_hint = bpy.props.BoolProperty(name="Bend Hint", default=True, description="Give IK chain a hint about which way to bend.  Useful for perfectly straight chains")
+    
     items = [('X', 'X', ''), ('Y', 'Y', ''), ('Z', 'Z', ''), ('-X', '-X', ''), ('-Y', '-Y', ''), ('-Z', '-Z', '')]
     params.primary_rotation_axis = bpy.props.EnumProperty(items=items, name="Primary Rotation Axis", default='X')
 
-    params.bend_hint = bpy.props.BoolProperty(name="Bend Hint", default=True, description="Give IK chain a hint about which way to bend.  Useful for perfectly straight chains")
     params.elbow_base_name = bpy.props.StringProperty(name="Elbow Name", default="elbow", description="Base name for the generated elbow-related controls")
 
     params.separate_ik_layers = bpy.props.BoolProperty(name="Separate IK Control Layers:", default=False, description="Enable putting the ik controls on a separate layer from the fk controls")
     params.ik_layers = bpy.props.BoolVectorProperty(size=32, description="Layers for the ik controls to be on")
 
-    params.use_complex_arm = bpy.props.BoolProperty(name="Complex Arm Rig", default=True, description="Generate the full, complex arm rig with twist bones and rubber-hose controls")
-
+    params.separate_hose_layers = bpy.props.BoolProperty(name="Separate Rubber-hose Control Layers:", default=False, description="Enable putting the rubber-hose controls on a separate layer from the other controls")
+    params.hose_layers = bpy.props.BoolVectorProperty(size=32, description="Layers for the rubber-hose controls to be on")
+    
 
 def parameters_ui(layout, params):
     """ Create the ui for the rig parameters.
@@ -112,6 +115,16 @@ def parameters_ui(layout, params):
     """
     col = layout.column()
     col.prop(params, "use_complex_arm")
+    
+    r = layout.row()
+    r.label(text="Elbow rotation axis:")
+    r.prop(params, "primary_rotation_axis", text="")
+    
+    r = layout.row()
+    r.prop(params, "elbow_base_name")
+    
+    r = layout.row()
+    r.prop(params, "bend_hint")
     
     r = layout.row()
     r.prop(params, "separate_ik_layers")
@@ -158,16 +171,53 @@ def parameters_ui(layout, params):
     row.prop(params, "ik_layers", index=29, toggle=True, text="")
     row.prop(params, "ik_layers", index=30, toggle=True, text="")
     row.prop(params, "ik_layers", index=31, toggle=True, text="")
+    
+    if params.use_complex_arm:
+        r = layout.row()
+        r.prop(params, "separate_hose_layers")
+        
+        r = layout.row()
+        r.active = params.separate_hose_layers
 
-    r = layout.row()
-    r.prop(params, "elbow_base_name")
+        col = r.column(align=True)
+        row = col.row(align=True)
+        row.prop(params, "hose_layers", index=0, toggle=True, text="")
+        row.prop(params, "hose_layers", index=1, toggle=True, text="")
+        row.prop(params, "hose_layers", index=2, toggle=True, text="")
+        row.prop(params, "hose_layers", index=3, toggle=True, text="")
+        row.prop(params, "hose_layers", index=4, toggle=True, text="")
+        row.prop(params, "hose_layers", index=5, toggle=True, text="")
+        row.prop(params, "hose_layers", index=6, toggle=True, text="")
+        row.prop(params, "hose_layers", index=7, toggle=True, text="")
+        row = col.row(align=True)
+        row.prop(params, "hose_layers", index=16, toggle=True, text="")
+        row.prop(params, "hose_layers", index=17, toggle=True, text="")
+        row.prop(params, "hose_layers", index=18, toggle=True, text="")
+        row.prop(params, "hose_layers", index=19, toggle=True, text="")
+        row.prop(params, "hose_layers", index=20, toggle=True, text="")
+        row.prop(params, "hose_layers", index=21, toggle=True, text="")
+        row.prop(params, "hose_layers", index=22, toggle=True, text="")
+        row.prop(params, "hose_layers", index=23, toggle=True, text="")
 
-    r = layout.row()
-    r.label(text="Elbow rotation axis:")
-    r.prop(params, "primary_rotation_axis", text="")
-
-    r = layout.row()
-    r.prop(params, "bend_hint")
+        col = r.column(align=True)
+        row = col.row(align=True)
+        row.prop(params, "hose_layers", index=8, toggle=True, text="")
+        row.prop(params, "hose_layers", index=9, toggle=True, text="")
+        row.prop(params, "hose_layers", index=10, toggle=True, text="")
+        row.prop(params, "hose_layers", index=11, toggle=True, text="")
+        row.prop(params, "hose_layers", index=12, toggle=True, text="")
+        row.prop(params, "hose_layers", index=13, toggle=True, text="")
+        row.prop(params, "hose_layers", index=14, toggle=True, text="")
+        row.prop(params, "hose_layers", index=15, toggle=True, text="")
+        row = col.row(align=True)
+        row.prop(params, "hose_layers", index=24, toggle=True, text="")
+        row.prop(params, "hose_layers", index=25, toggle=True, text="")
+        row.prop(params, "hose_layers", index=26, toggle=True, text="")
+        row.prop(params, "hose_layers", index=27, toggle=True, text="")
+        row.prop(params, "hose_layers", index=28, toggle=True, text="")
+        row.prop(params, "hose_layers", index=29, toggle=True, text="")
+        row.prop(params, "hose_layers", index=30, toggle=True, text="")
+        row.prop(params, "hose_layers", index=31, toggle=True, text="")
 
 
 def create_sample(obj):

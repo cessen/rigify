@@ -45,11 +45,15 @@ class Rig:
             raise MetarigError("RIGIFY ERROR: Bone '%s': input to rig type must be a chain of 3 bones" % (strip_org(bone)))
 
         # Get rig parameters
+        if params.separate_hose_layers:
+            layers = list(params.hose_layers)
+        else:
+            layers = None
         use_complex_rig = params.use_complex_arm
         elbow_base_name = params.elbow_base_name
         
         # Based on common limb
-        self.rubber_hose_limb = limb_common.RubberHoseLimb(obj, self.org_bones[0], self.org_bones[1], self.org_bones[2], use_complex_rig, elbow_base_name)
+        self.rubber_hose_limb = limb_common.RubberHoseLimb(obj, self.org_bones[0], self.org_bones[1], self.org_bones[2], use_complex_rig, elbow_base_name, layers)
 
     def generate(self):
         self.rubber_hose_limb.generate()

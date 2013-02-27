@@ -71,11 +71,15 @@ class Rig:
         self.org_bones = leg_bones + [foot, toe, heel]
 
         # Get rig parameters
+        if params.separate_hose_layers:
+            layers = list(params.hose_layers)
+        else:
+            layers = None
         use_complex_rig = params.use_complex_leg
         knee_base_name = params.knee_base_name
         
         # Based on common limb
-        self.rubber_hose_limb = limb_common.RubberHoseLimb(obj, self.org_bones[0], self.org_bones[1], self.org_bones[2], use_complex_rig, knee_base_name)
+        self.rubber_hose_limb = limb_common.RubberHoseLimb(obj, self.org_bones[0], self.org_bones[1], self.org_bones[2], use_complex_rig, knee_base_name, layers)
 
     def generate(self):
         self.rubber_hose_limb.generate()

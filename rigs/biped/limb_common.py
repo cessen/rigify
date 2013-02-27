@@ -520,7 +520,7 @@ class IKLimb:
 
 
 class RubberHoseLimb:
-    def __init__(self, obj, bone1, bone2, bone3, use_complex_limb, junc_base_name):
+    def __init__(self, obj, bone1, bone2, bone3, use_complex_limb, junc_base_name, layers):
         self.obj = obj
 
         # Get the chain of 3 connected bones
@@ -533,6 +533,7 @@ class RubberHoseLimb:
             self.org_parent = self.obj.data.bones[bone1].parent.name
 
         # Get rig parameters
+        self.layers = layers
         self.use_complex_limb = use_complex_limb
         self.junc_base_name = junc_base_name
 
@@ -798,6 +799,21 @@ class RubberHoseLimb:
             con.subtarget = self.org_bones[1]
             con.influence = 0.5
             
+            # Layers
+            if self.layers:
+                uhose_p.bone.layers = self.layers
+                jhose_p.bone.layers = self.layers
+                fhose_p.bone.layers = self.layers
+            else:
+                layers = list(pb[self.org_bones[0]].bone.layers)
+                uhose_p.bone.layers = layers
+                jhose_p.bone.layers = layers
+                fhose_p.bone.layers = layers
+            
+            # Create widgets
+            create_sphere_widget(self.obj, uhose)
+            create_sphere_widget(self.obj, jhose)
+            create_sphere_widget(self.obj, fhose)
             
             
             
