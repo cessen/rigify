@@ -7,17 +7,24 @@ from ...utils import MetarigError
 from rna_prop_ui import rna_idprop_ui_prop_get
 
 script = """
-controls = [%s]
-for name in controls[1:-1]:
+controls    = [%s]
+pb          = bpy.data.objects['%s'].pose.bones
+master_name = '%s'
+for name in controls:
     if is_selected(name):
-        layout.prop(pb[master_name], '["finger_curve"]', text="Curvature", slider=True)
+        layout.prop(pb[master_name], '["%s"]', text="Curvature", slider=True)
+        break
 """
 
 class Rig:
     
     def __init__(self, obj, bone_name, params):
         self.obj = obj
-        self.org_bones = [bone_name] + connected_children_names(obj, bone_name)
+        if params.palm:
+            self.palm      = bone_name
+            self.org_bones = connected_children_names(obj, bone_name)
+        else:
+            self.org_bones = [bone_name] + connected_children_names(obj, bone_name)
         self.params = params
         
         if len(self.org_bones) <= 1:
@@ -289,8 +296,8 @@ class Rig:
         create_sphere_widget(self.obj, tip_name)
         
         # Create UI
-        #controls_string = ", ".join(["'" + x + "'" for x in ctrl_chain])
-        #return [script % (controls_string)]
+        controls_string = ", ".join(["'" + x + "'" for x in ctrl_chain]) + ", " + "'" + master_name + "'"
+        return [script % (controls_string, self.obj.name, master_name, 'finger_curve')]
             
 def add_parameters(params):
     """ Add the parameters of this rig type to the
@@ -305,5 +312,3 @@ def parameters_ui(layout, params):
     r = layout.row()
     r.label(text="Bend rotation axis:")
     r.prop(params, "primary_rotation_axis", text="")
-
-
