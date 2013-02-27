@@ -45,11 +45,11 @@ class Rig:
             raise MetarigError("RIGIFY ERROR: Bone '%s': input to rig type must be a chain of 3 bones" % (strip_org(bone)))
 
         # Get rig parameters
-        use_upper_arm_twist = params.use_upper_arm_twist
-        use_forearm_twist = params.use_forearm_twist
+        use_complex_rig = params.use_complex_arm
+        elbow_base_name = params.elbow_base_name
         
         # Based on common limb
-        self.rubber_hose_limb = limb_common.RubberHoseLimb(obj, self.org_bones[0], self.org_bones[1], self.org_bones[2], use_upper_arm_twist, use_forearm_twist)
+        self.rubber_hose_limb = limb_common.RubberHoseLimb(obj, self.org_bones[0], self.org_bones[1], self.org_bones[2], use_complex_rig, elbow_base_name)
 
     def generate(self):
         self.rubber_hose_limb.generate()

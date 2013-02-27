@@ -60,7 +60,7 @@ class Rig:
             layers = None
         bend_hint = params.bend_hint
         primary_rotation_axis = params.primary_rotation_axis
-        pole_target_base_name = self.params.elbow_target_base_name
+        pole_target_base_name = self.params.elbow_base_name + "_target"
         
         # Arm is based on common limb
         self.ik_limb = limb_common.IKLimb(obj, self.org_bones[0], self.org_bones[1], self.org_bones[2], pole_target_base_name, primary_rotation_axis, bend_hint, layers, ikfk_switch)

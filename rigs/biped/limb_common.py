@@ -24,7 +24,7 @@ from mathutils import Vector
 
 from ...utils import MetarigError
 from ...utils import angle_on_plane, align_bone_roll
-from ...utils import copy_bone, put_bone, make_nonscaling_child
+from ...utils import new_bone, copy_bone, put_bone, make_nonscaling_child
 from ...utils import strip_org, make_mechanism_name, make_deformer_name, insert_before_lr
 from ...utils import get_layers
 from ...utils import create_widget, create_limb_widget, create_line_widget, create_sphere_widget, create_circle_widget
@@ -234,9 +234,12 @@ class IKLimb:
         # Create the bones
         ulimb = copy_bone(self.obj, self.org_bones[0], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[0], ".ik"))))
         flimb = copy_bone(self.obj, self.org_bones[1], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[1], ".ik"))))
-
         elimb = copy_bone(self.obj, self.org_bones[2], strip_org(insert_before_lr(self.org_bones[2], ".ik")))
         elimb_mch = copy_bone(self.obj, self.org_bones[2], make_mechanism_name(strip_org(self.org_bones[2])))
+        
+        ulimb_str = copy_bone(self.obj, self.org_bones[0], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[0], ".stretch.ik"))))
+        flimb_str = copy_bone(self.obj, self.org_bones[1], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[1], ".stretch.ik"))))
+
         pole_target_name = self.pole_target_base_name + "." + insert_before_lr(self.org_bones[0], ".ik").split(".", 1)[1]
         pole = copy_bone(self.obj, self.org_bones[0], pole_target_name)
 
@@ -252,6 +255,8 @@ class IKLimb:
         flimb_e = eb[flimb]
         elimb_e = eb[elimb]
         elimb_mch_e = eb[elimb_mch]
+        ulimb_str_e = eb[ulimb_str]
+        flimb_str_e = eb[flimb_str]
         pole_e = eb[pole]
         viselimb_e = eb[viselimb]
         vispole_e = eb[vispole]
@@ -268,6 +273,12 @@ class IKLimb:
         
         elimb_mch_e.use_connect = False
         elimb_mch_e.parent = elimb_e
+        
+        ulimb_str_e.use_connect = False
+        ulimb_str_e.parent = ulimb_e.parent
+        
+        flimb_str_e.use_connect = False
+        flimb_str_e.parent = ulimb_e.parent
 
         pole_e.use_connect = False
         if parent != None:
@@ -318,8 +329,11 @@ class IKLimb:
         bpy.ops.object.mode_set(mode='OBJECT')
         pb = self.obj.pose.bones
 
+        ulimb_p = pb[ulimb]
         flimb_p = pb[flimb]
         elimb_p = pb[elimb]
+        ulimb_str_p = pb[ulimb_str]
+        flimb_str_p = pb[flimb_str]
         pole_p = pb[pole]
         viselimb_p = pb[viselimb]
         vispole_p = pb[vispole]
@@ -334,6 +348,10 @@ class IKLimb:
         else:
             flimb_p.lock_ik_x = True
             flimb_p.lock_ik_y = True
+        
+        # Limb stretches
+        ulimb_p.ik_stretch = 0.0001
+        flimb_p.ik_stretch = 0.0001
 
         # Pole target only translates
         pole_p.lock_location = False, False, False
@@ -387,12 +405,27 @@ class IKLimb:
         con.pole_subtarget = pole
         con.pole_angle = pole_offset
         con.chain_count = 2
-
-        # Constrain org bones to controls
+        
+        # Stretch bone constraints
+        con = ulimb_str_p.constraints.new('COPY_TRANSFORMS')
+        con.name = "anchor"
+        con.target = self.obj
+        con.subtarget = ulimb
+        con = ulimb_str_p.constraints.new('MAINTAIN_VOLUME')
+        con.name = "stretch"
+        
+        con = flimb_str_p.constraints.new('COPY_TRANSFORMS')
+        con.name = "anchor"
+        con.target = self.obj
+        con.subtarget = flimb
+        con = flimb_str_p.constraints.new('MAINTAIN_VOLUME')
+        con.name = "stretch"
+        
+        # Constrain org bones
         con = pb[self.org_bones[0]].constraints.new('COPY_TRANSFORMS')
         con.name = "ik"
         con.target = self.obj
-        con.subtarget = ulimb
+        con.subtarget = ulimb_str
         if self.switch is True:
             # IK/FK switch driver
             fcurve = con.driver_add("influence")
@@ -407,7 +440,7 @@ class IKLimb:
         con = pb[self.org_bones[1]].constraints.new('COPY_TRANSFORMS')
         con.name = "ik"
         con.target = self.obj
-        con.subtarget = flimb
+        con.subtarget = flimb_str
         if self.switch is True:
             # IK/FK switch driver
             fcurve = con.driver_add("influence")
@@ -487,7 +520,7 @@ class IKLimb:
 
 
 class RubberHoseLimb:
-    def __init__(self, obj, bone1, bone2, bone3, use_upper_limb_twist, use_lower_limb_twist):
+    def __init__(self, obj, bone1, bone2, bone3, use_complex_limb, junc_base_name):
         self.obj = obj
 
         # Get the chain of 3 connected bones
@@ -500,8 +533,8 @@ class RubberHoseLimb:
             self.org_parent = self.obj.data.bones[bone1].parent.name
 
         # Get rig parameters
-        self.use_upper_limb_twist = use_upper_limb_twist
-        self.use_lower_limb_twist = use_lower_limb_twist
+        self.use_complex_limb = use_complex_limb
+        self.junc_base_name = junc_base_name
 
     def generate(self):
         bpy.ops.object.mode_set(mode='EDIT')
@@ -513,132 +546,258 @@ class RubberHoseLimb:
         else:
             parent = None
 
-        # Create upper limb bones
-        if self.use_upper_limb_twist:
-            ulimb1 = copy_bone(self.obj, self.org_bones[0], make_deformer_name(strip_org(self.org_bones[0] + ".01")))
-            ulimb2 = copy_bone(self.obj, self.org_bones[0], make_deformer_name(strip_org(self.org_bones[0] + ".02")))
-            utip = copy_bone(self.obj, self.org_bones[0], make_mechanism_name(strip_org(self.org_bones[0] + ".tip")))
-        else:
+        if not self.use_complex_limb:
+            # Simple rig
+            
+            # Create bones
             ulimb = copy_bone(self.obj, self.org_bones[0], make_deformer_name(strip_org(self.org_bones[0])))
-
-        # Create lower limb bones
-        if self.use_lower_limb_twist:
-            flimb1 = copy_bone(self.obj, self.org_bones[1], make_deformer_name(strip_org(self.org_bones[1] + ".01")))
-            flimb2 = copy_bone(self.obj, self.org_bones[1], make_deformer_name(strip_org(self.org_bones[1] + ".02")))
-            ftip = copy_bone(self.obj, self.org_bones[1], make_mechanism_name(strip_org(self.org_bones[1] + ".tip")))
-        else:
             flimb = copy_bone(self.obj, self.org_bones[1], make_deformer_name(strip_org(self.org_bones[1])))
+            elimb = copy_bone(self.obj, self.org_bones[2], make_deformer_name(strip_org(self.org_bones[2])))
 
-        # Create elimb bone
-        elimb = copy_bone(self.obj, self.org_bones[2], make_deformer_name(strip_org(self.org_bones[2])))
+            # Get edit bones
+            eb = self.obj.data.edit_bones
 
-        # Get edit bones
-        eb = self.obj.data.edit_bones
+            ulimb_e = eb[ulimb]
+            flimb_e = eb[flimb]
+            elimb_e = eb[elimb]
 
-        if parent != None:
-            parent_e = eb[parent]
+            # Parenting
+            elimb_e.parent = flimb_e
+            elimb_e.use_connect = True
+            
+            flimb_e.parent = ulimb_e
+            flimb_e.use_connect = True
+                
+            if parent != None:
+                elimb_e.use_connect = False
+                ulimb_e.parent = eb[parent]
+            
+            # Object mode, get pose bones
+            bpy.ops.object.mode_set(mode='OBJECT')
+            pb = self.obj.pose.bones
 
-        org_ulimb_e = eb[self.org_bones[0]]
-        if self.use_upper_limb_twist:
+            ulimb_p = pb[ulimb]
+            flimb_p = pb[flimb]
+            elimb_p = pb[elimb]
+
+            # Constrain def bones to org bones
+            con = ulimb_p.constraints.new('COPY_TRANSFORMS')
+            con.name = "def"
+            con.target = self.obj
+            con.subtarget = self.org_bones[0]
+
+            con = flimb_p.constraints.new('COPY_TRANSFORMS')
+            con.name = "def"
+            con.target = self.obj
+            con.subtarget = self.org_bones[1]
+
+            con = elimb_p.constraints.new('COPY_TRANSFORMS')
+            con.name = "def"
+            con.target = self.obj
+            con.subtarget = self.org_bones[2]
+        else:
+            # Complex rig
+            
+            # Create bones
+            ulimb1 = copy_bone(self.obj, self.org_bones[0], make_deformer_name(strip_org(insert_before_lr(self.org_bones[0], ".01"))))
+            ulimb2 = copy_bone(self.obj, self.org_bones[0], make_deformer_name(strip_org(insert_before_lr(self.org_bones[0], ".02"))))
+            flimb1 = copy_bone(self.obj, self.org_bones[1], make_deformer_name(strip_org(insert_before_lr(self.org_bones[1], ".01"))))
+            flimb2 = copy_bone(self.obj, self.org_bones[1], make_deformer_name(strip_org(insert_before_lr(self.org_bones[1], ".02"))))
+            elimb = copy_bone(self.obj, self.org_bones[2], make_deformer_name(strip_org(self.org_bones[2])))
+
+            junc = copy_bone(self.obj, self.org_bones[1], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[1], ".junc"))))
+            
+            uhose = new_bone(self.obj, strip_org(insert_before_lr(self.org_bones[0], "_hose")))
+            lr = self.org_bones[0].split(".", 1)  # Get the .R or .L off the end of the name if it exists
+            if len(lr) == 1:
+                lr = ""
+            else:
+                lr = lr[1]
+            jhose = new_bone(self.obj, self.junc_base_name + "_hose." + lr)
+            fhose = new_bone(self.obj, strip_org(insert_before_lr(self.org_bones[1], "_hose")))
+        
+            # Get edit bones
+            eb = self.obj.data.edit_bones
+
             ulimb1_e = eb[ulimb1]
             ulimb2_e = eb[ulimb2]
-            utip_e = eb[utip]
-        else:
-            ulimb_e = eb[ulimb]
-
-        org_flimb_e = eb[self.org_bones[1]]
-        if self.use_lower_limb_twist:
             flimb1_e = eb[flimb1]
             flimb2_e = eb[flimb2]
-            ftip_e = eb[ftip]
-        else:
-            flimb_e = eb[flimb]
-
-        org_elimb_e = eb[self.org_bones[2]]
-        elimb_e = eb[elimb]
-
-        # Parent and position upper limb bones
-        if self.use_upper_limb_twist:
-            ulimb1_e.use_connect = False
-            ulimb2_e.use_connect = False
-            utip_e.use_connect = False
-
+            elimb_e = eb[elimb]
+            
+            junc_e = eb[junc]
+            
+            uhose_e = eb[uhose]
+            jhose_e = eb[jhose]
+            fhose_e = eb[fhose]
+        
+            # Parenting
             if parent != None:
-                ulimb1_e.parent = parent_e
-            ulimb2_e.parent = org_ulimb_e
-            utip_e.parent = org_ulimb_e
-
-            center = Vector((org_ulimb_e.head + org_ulimb_e.tail) / 2)
-
-            ulimb1_e.tail = center
-            ulimb2_e.head = center
-            put_bone(self.obj, utip, org_ulimb_e.tail)
-            utip_e.length = org_ulimb_e.length / 8
-        else:
-            ulimb_e.use_connect = False
-            ulimb_e.parent = org_ulimb_e
-
-        # Parent and position lower limb bones
-        if self.use_lower_limb_twist:
-            flimb1_e.use_connect = False
+                ulimb1_e.use_connect = False
+                ulimb1_e.parent = eb[parent]
+            
+            ulimb2_e.use_connect = False
+            ulimb2_e.parent = eb[self.org_bones[0]]
+            
+            flimb1_e.use_connect = True
+            flimb1_e.parent = ulimb2_e
+            
             flimb2_e.use_connect = False
-            ftip_e.use_connect = False
-
-            flimb1_e.parent = org_flimb_e
-            flimb2_e.parent = org_flimb_e
-            ftip_e.parent = org_flimb_e
-
-            center = Vector((org_flimb_e.head + org_flimb_e.tail) / 2)
-
-            flimb1_e.tail = center
-            flimb2_e.head = center
-            put_bone(self.obj, ftip, org_flimb_e.tail)
-            ftip_e.length = org_flimb_e.length / 8
-
-            # Align roll of flimb2 with elimb
+            flimb2_e.parent = eb[self.org_bones[1]]
+            
+            elimb_e.use_connect = False
+            elimb_e.parent = eb[self.org_bones[2]]
+            
+            junc_e.use_connect = False
+            junc_e.parent = eb[self.org_bones[0]]
+            
+            uhose_e.use_connect = False
+            uhose_e.parent = eb[self.org_bones[0]]
+            
+            jhose_e.use_connect = False
+            jhose_e.parent = junc_e
+            
+            fhose_e.use_connect = False
+            fhose_e.parent = eb[self.org_bones[1]]
+            
+            # Positioning
+            ulimb1_e.length *= 0.5
+            ulimb2_e.head = Vector(ulimb1_e.tail)
+            flimb1_e.length *= 0.5
+            flimb2_e.head = Vector(flimb1_e.tail)
             align_bone_roll(self.obj, flimb2, elimb)
-        else:
-            flimb_e.use_connect = False
-            flimb_e.parent = org_flimb_e
-
-        # Parent limb-end
-        elimb_e.use_connect = False
-        elimb_e.parent = org_elimb_e
-
-        # Object mode, get pose bones
-        bpy.ops.object.mode_set(mode='OBJECT')
-        pb = self.obj.pose.bones
-
-        if self.use_upper_limb_twist:
+            
+            junc_e.length *= 0.2
+            
+            put_bone(self.obj, uhose, Vector(ulimb1_e.tail))
+            put_bone(self.obj, jhose, Vector(ulimb2_e.tail))
+            put_bone(self.obj, fhose, Vector(flimb1_e.tail))
+            
+            uhose_e.length = 0.05
+            jhose_e.length = 0.05
+            fhose_e.length = 0.05
+            
+            # Object mode, get pose bones
+            bpy.ops.object.mode_set(mode='OBJECT')
+            pb = self.obj.pose.bones
+            
             ulimb1_p = pb[ulimb1]
-        if self.use_lower_limb_twist:
+            ulimb2_p = pb[ulimb2]
+            flimb1_p = pb[flimb1]
             flimb2_p = pb[flimb2]
+            elimb_p = pb[elimb]
+            
+            junc_p = pb[junc]
+            
+            uhose_p = pb[uhose]
+            jhose_p = pb[jhose]
+            fhose_p = pb[fhose]
+            
+            # B-bone settings
+            ulimb2_p.bone.bbone_segments = 16
+            ulimb2_p.bone.bbone_in = 0.0
+            ulimb2_p.bone.bbone_out = 1.0
+            
+            flimb1_p.bone.bbone_segments = 16
+            flimb1_p.bone.bbone_in = 1.0
+            flimb1_p.bone.bbone_out = 0.0
+            
+            # Custom properties
+            prop = rna_idprop_ui_prop_get(jhose_p, "smooth_bend", create=True)
+            jhose_p["smooth_bend"] = 0.0
+            prop["soft_min"] = prop["min"] = 0.0
+            prop["soft_max"] = prop["max"] = 1.0
 
-        # Upper limb constraints
-        if self.use_upper_limb_twist:
-            con = ulimb1_p.constraints.new('COPY_LOCATION')
-            con.name = "copy_location"
-            con.target = self.obj
-            con.subtarget = self.org_bones[0]
-
+            # Drivers
+            fcurve = ulimb2_p.bone.driver_add("bbone_out")
+            driver = fcurve.driver
+            var = driver.variables.new()
+            driver.type = 'AVERAGE'
+            var.name = "var"
+            var.targets[0].id_type = 'OBJECT'
+            var.targets[0].id = self.obj
+            var.targets[0].data_path = jhose_p.path_from_id() + '["smooth_bend"]'
+            
+            fcurve = flimb1_p.bone.driver_add("bbone_in")
+            driver = fcurve.driver
+            var = driver.variables.new()
+            driver.type = 'AVERAGE'
+            var.name = "var"
+            var.targets[0].id_type = 'OBJECT'
+            var.targets[0].id = self.obj
+            var.targets[0].data_path = jhose_p.path_from_id() + '["smooth_bend"]'
+            
+            # Constraints
             con = ulimb1_p.constraints.new('COPY_SCALE')
-            con.name = "copy_scale"
+            con.name = "anchor"
             con.target = self.obj
             con.subtarget = self.org_bones[0]
-
             con = ulimb1_p.constraints.new('DAMPED_TRACK')
-            con.name = "track_to"
+            con.name = "track"
             con.target = self.obj
-            con.subtarget = utip
-
-        # Lower limb constraints
-        if self.use_lower_limb_twist:
+            con.subtarget = uhose
+            con = ulimb1_p.constraints.new('STRETCH_TO')
+            con.name = "track"
+            con.target = self.obj
+            con.subtarget = uhose
+            con.volume = 'NO_VOLUME'
+            
+            con = ulimb2_p.constraints.new('COPY_LOCATION')
+            con.name = "anchor"
+            con.target = self.obj
+            con.subtarget = uhose
+            con = ulimb2_p.constraints.new('DAMPED_TRACK')
+            con.name = "track"
+            con.target = self.obj
+            con.subtarget = jhose
+            con = ulimb2_p.constraints.new('STRETCH_TO')
+            con.name = "track"
+            con.target = self.obj
+            con.subtarget = jhose
+            con.volume = 'NO_VOLUME'
+            
+            con = flimb1_p.constraints.new('COPY_TRANSFORMS')
+            con.name = "anchor"
+            con.target = self.obj
+            con.subtarget = self.org_bones[1]
+            con = flimb1_p.constraints.new('COPY_LOCATION')
+            con.name = "anchor"
+            con.target = self.obj
+            con.subtarget = jhose
+            con = flimb1_p.constraints.new('DAMPED_TRACK')
+            con.name = "track"
+            con.target = self.obj
+            con.subtarget = fhose
+            con = flimb1_p.constraints.new('STRETCH_TO')
+            con.name = "track"
+            con.target = self.obj
+            con.subtarget = fhose
+            con.volume = 'NO_VOLUME'
+            
+            con = flimb2_p.constraints.new('COPY_LOCATION')
+            con.name = "anchor"
+            con.target = self.obj
+            con.subtarget = fhose
             con = flimb2_p.constraints.new('COPY_ROTATION')
-            con.name = "copy_rotation"
+            con.name = "twist"
             con.target = self.obj
             con.subtarget = elimb
-
             con = flimb2_p.constraints.new('DAMPED_TRACK')
-            con.name = "track_to"
+            con.name = "track"
             con.target = self.obj
-            con.subtarget = ftip
+            con.subtarget = self.org_bones[2]
+            con = flimb2_p.constraints.new('STRETCH_TO')
+            con.name = "track"
+            con.target = self.obj
+            con.subtarget = self.org_bones[2]
+            con.volume = 'NO_VOLUME'
+            
+            con = junc_p.constraints.new('COPY_TRANSFORMS')
+            con.name = "bend"
+            con.target = self.obj
+            con.subtarget = self.org_bones[1]
+            con.influence = 0.5
+            
+            
+            
+            

@@ -100,23 +100,21 @@ def add_parameters(params):
     params.primary_rotation_axis = bpy.props.EnumProperty(items=items, name="Primary Rotation Axis", default='X')
 
     params.bend_hint = bpy.props.BoolProperty(name="Bend Hint", default=True, description="Give IK chain a hint about which way to bend (useful for perfectly straight chains)")
-    params.knee_target_base_name = bpy.props.StringProperty(name="Knee Target Name", default="knee_target", description="Base name for the generated knee target")
-
+    params.knee_base_name = bpy.props.StringProperty(name="Knee Name", default="knee", description="Base name for the generated knee-related controls")
 
     params.separate_ik_layers = bpy.props.BoolProperty(name="Separate IK Control Layers:", default=False, description="Enable putting the ik controls on a separate layer from the fk controls")
     params.ik_layers = bpy.props.BoolVectorProperty(size=32, description="Layers for the ik controls to be on")
 
-    params.use_thigh_twist = bpy.props.BoolProperty(name="Thigh Twist", default=True, description="Generate the dual-bone twist setup for the thigh")
-    params.use_shin_twist = bpy.props.BoolProperty(name="Shin Twist", default=True, description="Generate the dual-bone twist setup for the shin")
+    params.use_complex_leg = bpy.props.BoolProperty(name="Complex Leg Rig", default=True, description="Generate the full, complex leg rig with twist bones and rubber-hose controls")
 
 
 def parameters_ui(layout, params):
     """ Create the ui for the rig parameters.
 
     """
-    r = layout.row()
-    r.prop(params, "knee_target_base_name")
-
+    col = layout.column()
+    col.prop(params, "use_complex_leg")
+    
     r = layout.row()
     r.prop(params, "separate_ik_layers")
 
@@ -164,15 +162,14 @@ def parameters_ui(layout, params):
     row.prop(params, "ik_layers", index=31, toggle=True, text="")
 
     r = layout.row()
+    r.prop(params, "knee_base_name")
+
+    r = layout.row()
     r.label(text="Knee rotation axis:")
     r.prop(params, "primary_rotation_axis", text="")
 
     r = layout.row()
     r.prop(params, "bend_hint")
-
-    col = layout.column()
-    col.prop(params, "use_thigh_twist")
-    col.prop(params, "use_shin_twist")
 
 
 def create_sample(obj):
