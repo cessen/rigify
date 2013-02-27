@@ -2,7 +2,7 @@ import bpy
 from mathutils import Vector
 from ...utils import copy_bone
 from ...utils import strip_org, make_deformer_name, connected_children_names, make_mechanism_name
-from ...utils import create_circle_widget
+from ...utils import create_circle_widget, create_sphere_widget, create_widget
 from ...utils import MetarigError
 from rna_prop_ui import rna_idprop_ui_prop_get
 
@@ -123,7 +123,7 @@ class Rig:
         # Creating tip conrtol bone 
         ctrl_bone_tip = self.obj.data.edit_bones.new(temp_name)
         ctrl_bone_tip.head[:] = eb[ctrl_chain[-1]].tail
-        tail_vec = Vector((0, 0, 0.5)) * self.obj.matrix_world
+        tail_vec = Vector((0, 0, 0.005)) * self.obj.matrix_world
         ctrl_bone_tip.tail[:] = eb[ctrl_chain[-1]].tail + tail_vec
         ctrl_bone_tip.roll    = eb[ctrl_chain[-1]].roll
         ctrl_bone_tip.parent  = eb[ctrl_chain[-1]]
@@ -137,8 +137,9 @@ class Rig:
         pb_master = pb[master_name]
         pb_master.lock_scale = True,False,True
         
-        pb[tip_name].lock_scale    = True,True,True
-        pb[tip_name].lock_rotation = True,True,True
+        pb[tip_name].lock_scale      = True,True,True
+        pb[tip_name].lock_rotation   = True,True,True
+        pb[tip_name].lock_rotation_w = True
         
         pb_master['finger_curve'] = 1.0
         prop = rna_idprop_ui_prop_get(pb_master, 'finger_curve')
@@ -204,19 +205,39 @@ class Rig:
             
             if mch_drv_chain.index(mch_drv) == 0:
                 # Constraining to master bone
-                con           = pb[mch_drv].constraints.new('COPY_LOCATION')
-                con.target    = self.obj
-                con.subtarget = master_name
+                con              = pb[mch_drv].constraints.new('COPY_LOCATION')
+                con.target       = self.obj
+                con.subtarget    = master_name
                 
-                con           = pb[mch_drv].constraints.new('COPY_ROTATION')
-                con.target    = self.obj
-                con.subtarget = master_name
+                con              = pb[mch_drv].constraints.new('COPY_ROTATION')
+                con.target       = self.obj
+                con.subtarget    = master_name
+                con.target_space = 'LOCAL'
+                con.owner_space  = 'LOCAL'
             
             else:
+                # Match axis to expression
+                options = {
+                    "X"  : { "axis" : 0,
+                             "expr" : '(1-sy)*pi' },
+                    "-X" : { "axis" : 0,
+                             "expr" : '-((1-sy)*pi)' },
+                    "Y"  : { "axis" : 1,
+                             "expr" : '(1-sy)*pi' },
+                    "-Y" : { "axis" : 1,
+                             "expr" : '-((1-sy)*pi)' },
+                    "Z"  : { "axis" : 2,
+                             "expr" : '(1-sy)*pi' },
+                    "-Z" : { "axis" : 2,
+                             "expr" : '-((1-sy)*pi)' }
+                }
+                
+                axis = self.params.primary_rotation_axis
+
                 # Drivers
-                drv                          = pb[mch_drv].driver_add("rotation_euler", 0).driver
+                drv                          = pb[mch_drv].driver_add("rotation_euler", options[axis]["axis"]).driver
                 drv.type                     = 'SCRIPTED'
-                drv.expression               = '(1-sy)*pi'
+                drv.expression               = options[axis]["expr"]
                 drv_var                      = drv.variables.new()
                 drv_var.name                 = 'sy'
                 drv_var.type                 = "SINGLE_PROP"
@@ -249,6 +270,40 @@ class Rig:
             # Assigning shapes to control bones
             create_circle_widget(self.obj, ctrl, radius=0.3, head_tail=0.5)
             
-            controls_string = ", ".join(["'" + x + "'" for x in ctrl_chain])
-            return [script % (controls_string)]
+        # Create ctrl master widget
+        w = create_widget(self.obj, master_name)
+        if w != None:
+            mesh = w.data
+            verts = [(0, 0, 0), (0, 1, 0), (0.05, 1, 0), (0.05, 1.1, 0), (-0.05, 1.1, 0), (-0.05, 1, 0)]
+            if 'Z' in self.params.primary_rotation_axis:
+                # Flip x/z coordinates
+                temp = []
+                for v in verts:
+                    temp += [(v[2], v[1], v[0])]
+                verts = temp
+            edges = [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 1)]
+            mesh.from_pydata(verts, edges, [])
+            mesh.update()
+        
+        # Create tip control widget
+        create_sphere_widget(self.obj, tip_name)
+        
+        # Create UI
+        #controls_string = ", ".join(["'" + x + "'" for x in ctrl_chain])
+        #return [script % (controls_string)]
             
+def add_parameters(params):
+    """ Add the parameters of this rig type to the
+        RigifyParameters PropertyGroup
+    """
+    items = [('X', 'X', ''), ('Y', 'Y', ''), ('Z', 'Z', ''), ('-X', '-X', ''), ('-Y', '-Y', ''), ('-Z', '-Z', '')]
+    params.primary_rotation_axis = bpy.props.EnumProperty(items=items, name="Primary Rotation Axis", default='X')
+
+def parameters_ui(layout, params):
+    """ Create the ui for the rig parameters.
+    """
+    r = layout.row()
+    r.label(text="Bend rotation axis:")
+    r.prop(params, "primary_rotation_axis", text="")
+
+
