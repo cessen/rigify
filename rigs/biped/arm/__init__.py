@@ -31,13 +31,6 @@ fk_arm = ["%s", "%s", "%s"]
 ik_arm = ["%s", "%s", "%s", "%s"]
 if is_selected(fk_arm+ik_arm):
     layout.prop(pose_bones[ik_arm[2]], '["ikfk_switch"]', text="FK / IK (" + ik_arm[2] + ")", slider=True)
-if is_selected(fk_arm):
-    try:
-        pose_bones[fk_arm[0]]["isolate"]
-        layout.prop(pose_bones[fk_arm[0]], '["isolate"]', text="Isolate Rotation (" + fk_arm[0] + ")", slider=True)
-    except KeyError:
-        pass
-if is_selected(fk_arm+ik_arm):
     props = layout.operator("pose.rigify_arm_fk2ik_" + rig_id, text="Snap FK->IK (" + fk_arm[0] + ")")
     props.uarm_fk = fk_arm[0]
     props.farm_fk = fk_arm[1]
@@ -53,13 +46,24 @@ if is_selected(fk_arm+ik_arm):
     props.farm_ik = ik_arm[1]
     props.hand_ik = ik_arm[2]
     props.pole = ik_arm[3]
-
+if is_selected(fk_arm):
+    try:
+        pose_bones[fk_arm[0]]["isolate"]
+        layout.prop(pose_bones[fk_arm[0]], '["isolate"]', text="Isolate Rotation (" + fk_arm[0] + ")", slider=True)
+    except KeyError:
+        pass
+    layout.prop(pose_bones[fk_arm[0]], '["stretch"]', text="Stretch FK (" + fk_arm[0] + ")", slider=True)
 """
 
 hose_script = """
 hose_arm = ["%s", "%s", "%s"]
 if is_selected(hose_arm):
     layout.prop(pose_bones[hose_arm[1]], '["smooth_bend"]', text="Smooth Elbow (" + hose_arm[1] + ")", slider=True)
+"""
+
+end_script = """
+if is_selected(fk_arm+ik_arm):
+    layout.separator()
 """
 
 
@@ -98,6 +102,7 @@ class Rig:
         ui_script = script % (fk_controls[0], fk_controls[1], fk_controls[2], ik_controls[0], ik_controls[1], ik_controls[2], ik_controls[3])
         if self.params.use_complex_arm:
             ui_script += hose_script % (hose_controls[0], hose_controls[1], hose_controls[2])
+        ui_script += end_script
         return [ui_script]
 
 

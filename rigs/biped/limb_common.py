@@ -61,6 +61,10 @@ class FKLimb:
         flimb = copy_bone(self.obj, self.org_bones[1], strip_org(insert_before_lr(self.org_bones[1], ".fk")))
         elimb = copy_bone(self.obj, self.org_bones[2], strip_org(insert_before_lr(self.org_bones[2], ".fk")))
 
+        # Create the anti-stretch bones
+        fantistr = copy_bone(self.obj, self.org_bones[0], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[0], "_antistr.fk"))))
+        eantistr = copy_bone(self.obj, self.org_bones[1], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[1], "_antistr.fk"))))
+
         # Create the end-limb mechanism bone
         elimb_mch = copy_bone(self.obj, self.org_bones[2], make_mechanism_name(strip_org(self.org_bones[2])))
 
@@ -75,6 +79,10 @@ class FKLimb:
         ulimb_e = eb[ulimb]
         flimb_e = eb[flimb]
         elimb_e = eb[elimb]
+        
+        fantistr_e = eb[fantistr]
+        eantistr_e = eb[eantistr]
+        
         elimb_mch_e = eb[elimb_mch]
 
         if parent != None:
@@ -82,11 +90,20 @@ class FKLimb:
             socket2_e = eb[socket2]
 
         # Parenting
-        flimb_e.parent = ulimb_e
-        elimb_e.parent = flimb_e
-        
         elimb_mch_e.use_connect = False
         elimb_mch_e.parent = elimb_e
+        
+        elimb_e.use_connect = False
+        elimb_e.parent = eantistr_e
+        
+        eantistr_e.use_connect = False
+        eantistr_e.parent = flimb_e
+        
+        flimb_e.use_connect = False
+        flimb_e.parent = fantistr_e
+        
+        fantistr_e.use_connect = False
+        fantistr_e.parent = ulimb_e
 
         if parent != None:
             socket1_e.use_connect = False
@@ -98,8 +115,12 @@ class FKLimb:
             ulimb_e.use_connect = False
             ulimb_e.parent = socket2_e
             
-
         # Positioning
+        fantistr_e.length /= 8
+        put_bone(self.obj, fantistr, Vector(ulimb_e.tail))
+        eantistr_e.length /= 8
+        put_bone(self.obj, eantistr, Vector(flimb_e.tail))
+        
         if parent != None:
             socket1_e.length /= 4
             socket2_e.length /= 3
@@ -112,9 +133,17 @@ class FKLimb:
         flimb_p = pb[flimb]
         elimb_p = pb[elimb]
         elimb_mch_p = pb[elimb_mch]
+        
+        fantistr_p = pb[fantistr]
+        eantistr_p = pb[eantistr]
 
         if parent != None:
             socket2_p = pb[socket2]
+
+        # Lock axes
+        ulimb_p.lock_location = (True, True, True)
+        flimb_p.lock_location = (True, True, True)
+        elimb_p.lock_location = (True, True, True)
 
         # Set the elbow to only bend on the x-axis.
         flimb_p.rotation_mode = 'XYZ'
@@ -131,6 +160,75 @@ class FKLimb:
             ulimb_p["isolate"] = 0.0
             prop["soft_min"] = prop["min"] = 0.0
             prop["soft_max"] = prop["max"] = 1.0
+
+        prop = rna_idprop_ui_prop_get(ulimb_p, "stretch", create=True)
+        ulimb_p["stretch"] = 1.0
+        prop["min"] = 0.05
+        prop["max"] = 20.0
+        prop["soft_min"] =  0.25
+        prop["soft_max"] = 4.0
+
+        # Stretch drivers
+        def add_stretch_drivers(pose_bone):
+            driver = pose_bone.driver_add("scale", 1).driver
+            var = driver.variables.new()
+            var.name = "stretch"
+            var.targets[0].id_type = 'OBJECT'
+            var.targets[0].id = self.obj
+            var.targets[0].data_path = ulimb_p.path_from_id() + '["stretch"]'
+            driver.type = 'SCRIPTED'
+            driver.expression = "stretch"
+            
+            driver = pose_bone.driver_add("scale", 0).driver
+            var = driver.variables.new()
+            var.name = "stretch"
+            var.targets[0].id_type = 'OBJECT'
+            var.targets[0].id = self.obj
+            var.targets[0].data_path = ulimb_p.path_from_id() + '["stretch"]'
+            driver.type = 'SCRIPTED'
+            driver.expression = "1/sqrt(stretch)"
+            
+            driver = pose_bone.driver_add("scale", 2).driver
+            var = driver.variables.new()
+            var.name = "stretch"
+            var.targets[0].id_type = 'OBJECT'
+            var.targets[0].id = self.obj
+            var.targets[0].data_path = ulimb_p.path_from_id() + '["stretch"]'
+            driver.type = 'SCRIPTED'
+            driver.expression = "1/sqrt(stretch)"
+        
+        def add_antistretch_drivers(pose_bone):
+            driver = pose_bone.driver_add("scale", 1).driver
+            var = driver.variables.new()
+            var.name = "stretch"
+            var.targets[0].id_type = 'OBJECT'
+            var.targets[0].id = self.obj
+            var.targets[0].data_path = ulimb_p.path_from_id() + '["stretch"]'
+            driver.type = 'SCRIPTED'
+            driver.expression = "1/stretch"
+            
+            driver = pose_bone.driver_add("scale", 0).driver
+            var = driver.variables.new()
+            var.name = "stretch"
+            var.targets[0].id_type = 'OBJECT'
+            var.targets[0].id = self.obj
+            var.targets[0].data_path = ulimb_p.path_from_id() + '["stretch"]'
+            driver.type = 'SCRIPTED'
+            driver.expression = "sqrt(stretch)"
+            
+            driver = pose_bone.driver_add("scale", 2).driver
+            var = driver.variables.new()
+            var.name = "stretch"
+            var.targets[0].id_type = 'OBJECT'
+            var.targets[0].id = self.obj
+            var.targets[0].data_path = ulimb_p.path_from_id() + '["stretch"]'
+            driver.type = 'SCRIPTED'
+            driver.expression = "sqrt(stretch)"
+        
+        add_stretch_drivers(ulimb_p)
+        add_stretch_drivers(flimb_p)
+        add_antistretch_drivers(fantistr_p)
+        add_antistretch_drivers(eantistr_p)
 
         # Hinge constraints / drivers
         if parent != None:
