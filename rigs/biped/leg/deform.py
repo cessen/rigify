@@ -77,12 +77,13 @@ class Rig:
             layers = None
         use_complex_rig = params.use_complex_leg
         knee_base_name = params.knee_base_name
+        primary_rotation_axis = params.primary_rotation_axis
         
         # Based on common limb
-        self.rubber_hose_limb = limb_common.RubberHoseLimb(obj, self.org_bones[0], self.org_bones[1], self.org_bones[2], use_complex_rig, knee_base_name, layers)
+        self.rubber_hose_limb = limb_common.RubberHoseLimb(obj, self.org_bones[0], self.org_bones[1], self.org_bones[2], use_complex_rig, knee_base_name, primary_rotation_axis, layers)
 
     def generate(self):
-        self.rubber_hose_limb.generate()
+        bone_list = self.rubber_hose_limb.generate()
         
         # Set up toe
         bpy.ops.object.mode_set(mode='EDIT')
@@ -90,4 +91,6 @@ class Rig:
         eb = self.obj.data.edit_bones
         eb[toe].use_connect = False
         eb[toe].parent = eb[self.org_bones[3]]
+        
+        return bone_list
 

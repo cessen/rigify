@@ -23,7 +23,7 @@ from rna_prop_ui import rna_idprop_ui_prop_get
 from mathutils import Vector
 
 from ...utils import MetarigError
-from ...utils import angle_on_plane, align_bone_roll
+from ...utils import angle_on_plane, align_bone_roll, align_bone_z_axis
 from ...utils import new_bone, copy_bone, put_bone, make_nonscaling_child
 from ...utils import strip_org, make_mechanism_name, make_deformer_name, insert_before_lr
 from ...utils import get_layers
@@ -520,7 +520,7 @@ class IKLimb:
 
 
 class RubberHoseLimb:
-    def __init__(self, obj, bone1, bone2, bone3, use_complex_limb, junc_base_name, layers):
+    def __init__(self, obj, bone1, bone2, bone3, use_complex_limb, junc_base_name, primary_rotation_axis, layers):
         self.obj = obj
 
         # Get the chain of 3 connected bones
@@ -534,6 +534,7 @@ class RubberHoseLimb:
 
         # Get rig parameters
         self.layers = layers
+        self.primary_rotation_axis = primary_rotation_axis
         self.use_complex_limb = use_complex_limb
         self.junc_base_name = junc_base_name
 
@@ -596,6 +597,8 @@ class RubberHoseLimb:
             con.name = "def"
             con.target = self.obj
             con.subtarget = self.org_bones[2]
+            
+            return []
         else:
             # Complex rig
             
@@ -674,9 +677,39 @@ class RubberHoseLimb:
             put_bone(self.obj, jhose, Vector(ulimb2_e.tail))
             put_bone(self.obj, fhose, Vector(flimb1_e.tail))
             
-            uhose_e.length = 0.05
-            jhose_e.length = 0.05
-            fhose_e.length = 0.05
+            if 'X' in self.primary_rotation_axis:
+                upoint = Vector(ulimb1_e.z_axis)
+                fpoint = Vector(flimb1_e.z_axis)
+            elif 'Z' in self.primary_rotation_axis:
+                upoint = Vector(ulimb1_e.x_axis)
+                fpoint = Vector(flimb1_e.x_axis)
+            else:  # Y
+                upoint = Vector(ulimb1_e.z_axis)
+                fpoint = Vector(flimb1_e.z_axis)
+            
+            if '-' not in self.primary_rotation_axis:
+                upoint *= -1
+                fpoint *= -1
+            
+            if 'Y' in self.primary_rotation_axis:
+                uside = Vector(ulimb1_e.x_axis)
+                fside = Vector(flimb1_e.x_axis)
+            else:
+                uside = Vector(ulimb1_e.y_axis) * -1
+                fside = Vector(flimb1_e.y_axis) * -1
+            
+            uhose_e.tail = uhose_e.head + upoint
+            jhose_e.tail = fhose_e.head + upoint + fpoint
+            fhose_e.tail = fhose_e.head + fpoint
+            
+            align_bone_z_axis(self.obj, uhose, uside)
+            align_bone_z_axis(self.obj, jhose, uside+fside)
+            align_bone_z_axis(self.obj, fhose, fside)
+            
+            l = 0.125 * (ulimb1_e.length + ulimb2_e.length + flimb1_e.length + flimb2_e.length)
+            uhose_e.length = l
+            jhose_e.length = l
+            fhose_e.length = l
             
             # Object mode, get pose bones
             bpy.ops.object.mode_set(mode='OBJECT')
@@ -693,6 +726,19 @@ class RubberHoseLimb:
             uhose_p = pb[uhose]
             jhose_p = pb[jhose]
             fhose_p = pb[fhose]
+            
+            # Lock axes
+            uhose_p.lock_rotation = (True, True, True)
+            uhose_p.lock_rotation_w = True
+            uhose_p.lock_scale = (True, True, True)
+            
+            jhose_p.lock_rotation = (True, True, True)
+            jhose_p.lock_rotation_w = True
+            jhose_p.lock_scale = (True, True, True)
+            
+            fhose_p.lock_rotation = (True, True, True)
+            fhose_p.lock_rotation_w = True
+            fhose_p.lock_scale = (True, True, True)
             
             # B-bone settings
             ulimb2_p.bone.bbone_segments = 16
@@ -814,6 +860,8 @@ class RubberHoseLimb:
             create_sphere_widget(self.obj, uhose)
             create_sphere_widget(self.obj, jhose)
             create_sphere_widget(self.obj, fhose)
+            
+            return [uhose, jhose, fhose]
             
             
             

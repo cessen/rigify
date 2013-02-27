@@ -58,6 +58,12 @@ if is_selected(fk_leg+ik_leg):
     p.mfoot_ik  = ik_leg[5]
 """
 
+hose_script = """
+hose_leg = ["%s", "%s", "%s"]
+if is_selected(hose_leg):
+    layout.prop(pose_bones[hose_leg[1]], '["smooth_bend"]', text="Smooth Knee (" + hose_leg[1] + ")", slider=True)
+"""
+
 
 class Rig:
     """ A leg rig, with IK/FK switching, a hinge switch, and foot roll.
@@ -70,6 +76,9 @@ class Rig:
             Do NOT change any data in the scene.  This is a gathering phase only.
 
         """
+        self.obj = obj
+        self.params = params
+        
         # Gather deform rig
         self.deform_rig = deform.Rig(obj, bone, params)
 
@@ -85,10 +94,13 @@ class Rig:
             The main armature should be selected and active before this is called.
 
         """
-        self.deform_rig.generate()
+        hose_controls = self.deform_rig.generate()
         fk_controls = self.fk_rig.generate()
         ik_controls = self.ik_rig.generate()
-        return [script % (fk_controls[0], fk_controls[1], fk_controls[2], fk_controls[3], ik_controls[0], ik_controls[1], ik_controls[2], ik_controls[3], ik_controls[4], ik_controls[5])]
+        ui_script = script % (fk_controls[0], fk_controls[1], fk_controls[2], fk_controls[3], ik_controls[0], ik_controls[1], ik_controls[2], ik_controls[3], ik_controls[4], ik_controls[5])
+        if self.params.use_complex_leg:
+            ui_script += hose_script % (hose_controls[0], hose_controls[1], hose_controls[2])
+        return [ui_script]
 
 
 def add_parameters(params):

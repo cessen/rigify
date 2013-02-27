@@ -56,6 +56,12 @@ if is_selected(fk_arm+ik_arm):
 
 """
 
+hose_script = """
+hose_arm = ["%s", "%s", "%s"]
+if is_selected(hose_arm):
+    layout.prop(pose_bones[hose_arm[1]], '["smooth_bend"]', text="Smooth Elbow (" + hose_arm[1] + ")", slider=True)
+"""
+
 
 class Rig:
     """ An arm rig, with IK/FK switching and hinge switch.
@@ -68,6 +74,9 @@ class Rig:
             Do NOT change any data in the scene.  This is a gathering phase only.
 
         """
+        self.obj = obj
+        self.params = params
+        
         # Gather deform rig
         self.deform_rig = deform.Rig(obj, bone, params)
 
@@ -83,10 +92,13 @@ class Rig:
             The main armature should be selected and active before this is called.
 
         """
-        self.deform_rig.generate()
+        hose_controls = self.deform_rig.generate()
         fk_controls = self.fk_rig.generate()
         ik_controls = self.ik_rig.generate()
-        return [script % (fk_controls[0], fk_controls[1], fk_controls[2], ik_controls[0], ik_controls[1], ik_controls[2], ik_controls[3])]
+        ui_script = script % (fk_controls[0], fk_controls[1], fk_controls[2], ik_controls[0], ik_controls[1], ik_controls[2], ik_controls[3])
+        if self.params.use_complex_arm:
+            ui_script += hose_script % (hose_controls[0], hose_controls[1], hose_controls[2])
+        return [ui_script]
 
 
 def add_parameters(params):
