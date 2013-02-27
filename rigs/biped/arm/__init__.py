@@ -53,6 +53,9 @@ if is_selected(fk_arm):
     except KeyError:
         pass
     layout.prop(pose_bones[fk_arm[0]], '["stretch"]', text="Stretch FK (" + fk_arm[0] + ")", slider=True)
+if is_selected(ik_arm):
+    layout.prop(pose_bones[ik_arm[2]], '["stretch"]', text="Stretch IK (" + ik_arm[2] + ")", slider=True)
+
 """
 
 hose_script = """

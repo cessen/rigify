@@ -463,6 +463,43 @@ class IKLimb:
             elimb_p["ikfk_switch"] = 0.0
             prop["soft_min"] = prop["min"] = 0.0
             prop["soft_max"] = prop["max"] = 1.0
+        
+        prop = rna_idprop_ui_prop_get(elimb_p, "stretch", create=True)
+        elimb_p["stretch"] = 1.0
+        prop["min"] = 0.05
+        prop["max"] = 20.0
+        prop["soft_min"] =  0.25
+        prop["soft_max"] = 4.0
+        
+        # Stretch parameter drivers
+        def add_stretch_drivers(pose_bone):
+            driver = pose_bone.driver_add("scale", 1).driver
+            var = driver.variables.new()
+            var.name = "stretch"
+            var.targets[0].id_type = 'OBJECT'
+            var.targets[0].id = self.obj
+            var.targets[0].data_path = elimb_p.path_from_id() + '["stretch"]'
+            driver.type = 'SCRIPTED'
+            driver.expression = "stretch"
+            
+            driver = pose_bone.driver_add("scale", 0).driver
+            var = driver.variables.new()
+            var.name = "stretch"
+            var.targets[0].id_type = 'OBJECT'
+            var.targets[0].id = self.obj
+            var.targets[0].data_path = elimb_p.path_from_id() + '["stretch"]'
+            driver.type = 'SCRIPTED'
+            driver.expression = "stretch"
+            
+            driver = pose_bone.driver_add("scale", 2).driver
+            var = driver.variables.new()
+            var.name = "stretch"
+            var.targets[0].id_type = 'OBJECT'
+            var.targets[0].id = self.obj
+            var.targets[0].data_path = elimb_p.path_from_id() + '["stretch"]'
+            driver.type = 'SCRIPTED'
+            driver.expression = "stretch"
+        add_stretch_drivers(ulimb_p)
 
         # Bend direction hint
         if self.bend_hint:
