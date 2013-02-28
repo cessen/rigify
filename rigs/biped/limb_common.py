@@ -464,8 +464,8 @@ class IKLimb:
             flimb_nostr_p.lock_ik_y = True
         
         # Limb stretches
-        ulimb_p.ik_stretch = 0.0001
-        flimb_p.ik_stretch = 0.0001
+        ulimb_p.ik_stretch = 1.0
+        flimb_p.ik_stretch = 1.0
         ulimb_nostr_p.ik_stretch = 0.0
         flimb_nostr_p.ik_stretch = 0.0
 
