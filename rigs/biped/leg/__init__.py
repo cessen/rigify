@@ -38,6 +38,7 @@ if is_selected(fk_leg+ik_leg):
     p.mfoot_fk = fk_leg[3]
     p.thigh_ik = ik_leg[0]
     p.shin_ik  = ik_leg[1]
+    p.foot_ik = ik_leg[2]
     p.mfoot_ik = ik_leg[5]
     p = layout.operator("pose.rigify_leg_ik2fk_" + rig_id, text="Snap IK->FK (" + fk_leg[0] + ")")
     p.thigh_fk  = fk_leg[0]
