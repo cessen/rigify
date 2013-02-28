@@ -464,10 +464,21 @@ class IKLimb:
             flimb_nostr_p.lock_ik_y = True
         
         # Limb stretches
-        ulimb_p.ik_stretch = 1.0
-        flimb_p.ik_stretch = 1.0
         ulimb_nostr_p.ik_stretch = 0.0
         flimb_nostr_p.ik_stretch = 0.0
+        
+        # This next bit is weird.  The values calculated cause
+        # ulimb and flimb to preserve their relative lengths
+        # while stretching.
+        l1 = ulimb_p.length
+        l2 = flimb_p.length
+        if l1 < l2:
+            ulimb_p.ik_stretch = (l1**(1/3)) / (l2**(1/3))
+            flimb_p.ik_stretch = 1.0
+        else:
+            ulimb_p.ik_stretch = 1.0
+            flimb_p.ik_stretch = (l2**(1/3)) / (l1**(1/3))
+        
 
         # Pole target only translates
         pole_p.lock_location = False, False, False
