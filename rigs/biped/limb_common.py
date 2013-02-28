@@ -161,8 +161,8 @@ class FKLimb:
             prop["soft_min"] = prop["min"] = 0.0
             prop["soft_max"] = prop["max"] = 1.0
 
-        prop = rna_idprop_ui_prop_get(ulimb_p, "stretch", create=True)
-        ulimb_p["stretch"] = 1.0
+        prop = rna_idprop_ui_prop_get(ulimb_p, "stretch_length", create=True)
+        ulimb_p["stretch_length"] = 1.0
         prop["min"] = 0.05
         prop["max"] = 20.0
         prop["soft_min"] =  0.25
@@ -172,58 +172,58 @@ class FKLimb:
         def add_stretch_drivers(pose_bone):
             driver = pose_bone.driver_add("scale", 1).driver
             var = driver.variables.new()
-            var.name = "stretch"
+            var.name = "stretch_length"
             var.targets[0].id_type = 'OBJECT'
             var.targets[0].id = self.obj
-            var.targets[0].data_path = ulimb_p.path_from_id() + '["stretch"]'
+            var.targets[0].data_path = ulimb_p.path_from_id() + '["stretch_length"]'
             driver.type = 'SCRIPTED'
-            driver.expression = "stretch"
+            driver.expression = "stretch_length"
             
             driver = pose_bone.driver_add("scale", 0).driver
             var = driver.variables.new()
-            var.name = "stretch"
+            var.name = "stretch_length"
             var.targets[0].id_type = 'OBJECT'
             var.targets[0].id = self.obj
-            var.targets[0].data_path = ulimb_p.path_from_id() + '["stretch"]'
+            var.targets[0].data_path = ulimb_p.path_from_id() + '["stretch_length"]'
             driver.type = 'SCRIPTED'
-            driver.expression = "1/sqrt(stretch)"
+            driver.expression = "1/sqrt(stretch_length)"
             
             driver = pose_bone.driver_add("scale", 2).driver
             var = driver.variables.new()
-            var.name = "stretch"
+            var.name = "stretch_length"
             var.targets[0].id_type = 'OBJECT'
             var.targets[0].id = self.obj
-            var.targets[0].data_path = ulimb_p.path_from_id() + '["stretch"]'
+            var.targets[0].data_path = ulimb_p.path_from_id() + '["stretch_length"]'
             driver.type = 'SCRIPTED'
-            driver.expression = "1/sqrt(stretch)"
+            driver.expression = "1/sqrt(stretch_length)"
         
         def add_antistretch_drivers(pose_bone):
             driver = pose_bone.driver_add("scale", 1).driver
             var = driver.variables.new()
-            var.name = "stretch"
+            var.name = "stretch_length"
             var.targets[0].id_type = 'OBJECT'
             var.targets[0].id = self.obj
-            var.targets[0].data_path = ulimb_p.path_from_id() + '["stretch"]'
+            var.targets[0].data_path = ulimb_p.path_from_id() + '["stretch_length"]'
             driver.type = 'SCRIPTED'
-            driver.expression = "1/stretch"
+            driver.expression = "1/stretch_length"
             
             driver = pose_bone.driver_add("scale", 0).driver
             var = driver.variables.new()
-            var.name = "stretch"
+            var.name = "stretch_length"
             var.targets[0].id_type = 'OBJECT'
             var.targets[0].id = self.obj
-            var.targets[0].data_path = ulimb_p.path_from_id() + '["stretch"]'
+            var.targets[0].data_path = ulimb_p.path_from_id() + '["stretch_length"]'
             driver.type = 'SCRIPTED'
-            driver.expression = "sqrt(stretch)"
+            driver.expression = "sqrt(stretch_length)"
             
             driver = pose_bone.driver_add("scale", 2).driver
             var = driver.variables.new()
-            var.name = "stretch"
+            var.name = "stretch_length"
             var.targets[0].id_type = 'OBJECT'
             var.targets[0].id = self.obj
-            var.targets[0].data_path = ulimb_p.path_from_id() + '["stretch"]'
+            var.targets[0].data_path = ulimb_p.path_from_id() + '["stretch_length"]'
             driver.type = 'SCRIPTED'
-            driver.expression = "sqrt(stretch)"
+            driver.expression = "sqrt(stretch_length)"
         
         add_stretch_drivers(ulimb_p)
         add_stretch_drivers(flimb_p)
@@ -335,6 +335,9 @@ class IKLimb:
         elimb = copy_bone(self.obj, self.org_bones[2], strip_org(insert_before_lr(self.org_bones[2], ".ik")))
         elimb_mch = copy_bone(self.obj, self.org_bones[2], make_mechanism_name(strip_org(self.org_bones[2])))
         
+        ulimb_nostr = copy_bone(self.obj, self.org_bones[0], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[0], ".nostr.ik"))))
+        flimb_nostr = copy_bone(self.obj, self.org_bones[1], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[1], ".nostr.ik"))))
+        
         ulimb_str = copy_bone(self.obj, self.org_bones[0], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[0], ".stretch.ik"))))
         flimb_str = copy_bone(self.obj, self.org_bones[1], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[1], ".stretch.ik"))))
 
@@ -353,6 +356,8 @@ class IKLimb:
         flimb_e = eb[flimb]
         elimb_e = eb[elimb]
         elimb_mch_e = eb[elimb_mch]
+        ulimb_nostr_e = eb[ulimb_nostr]
+        flimb_nostr_e = eb[flimb_nostr]
         ulimb_str_e = eb[ulimb_str]
         flimb_str_e = eb[flimb_str]
         pole_e = eb[pole]
@@ -361,10 +366,13 @@ class IKLimb:
 
         # Parenting
         ulimb_e.use_connect = False
+        ulimb_nostr_e.use_connect = False
         if parent != None:
             ulimb_e.parent = parent_e
+            ulimb_nostr_e.parent = parent_e
         
         flimb_e.parent = ulimb_e
+        flimb_nostr_e.parent = ulimb_nostr_e
 
         elimb_e.use_connect = False
         elimb_e.parent = None
@@ -430,6 +438,8 @@ class IKLimb:
         ulimb_p = pb[ulimb]
         flimb_p = pb[flimb]
         elimb_p = pb[elimb]
+        ulimb_nostr_p = pb[ulimb_nostr]
+        flimb_nostr_p = pb[flimb_nostr]
         ulimb_str_p = pb[ulimb_str]
         flimb_str_p = pb[flimb_str]
         pole_p = pb[pole]
@@ -440,16 +450,24 @@ class IKLimb:
         if 'X' in self.primary_rotation_axis:
             flimb_p.lock_ik_y = True
             flimb_p.lock_ik_z = True
+            flimb_nostr_p.lock_ik_y = True
+            flimb_nostr_p.lock_ik_z = True
         elif 'Y' in self.primary_rotation_axis:
             flimb_p.lock_ik_x = True
             flimb_p.lock_ik_z = True
+            flimb_nostr_p.lock_ik_x = True
+            flimb_nostr_p.lock_ik_z = True
         else:
             flimb_p.lock_ik_x = True
             flimb_p.lock_ik_y = True
+            flimb_nostr_p.lock_ik_x = True
+            flimb_nostr_p.lock_ik_y = True
         
         # Limb stretches
         ulimb_p.ik_stretch = 0.0001
         flimb_p.ik_stretch = 0.0001
+        ulimb_nostr_p.ik_stretch = 0.0
+        flimb_nostr_p.ik_stretch = 0.0
 
         # Pole target only translates
         pole_p.lock_location = False, False, False
@@ -464,75 +482,94 @@ class IKLimb:
             prop["soft_min"] = prop["min"] = 0.0
             prop["soft_max"] = prop["max"] = 1.0
         
-        prop = rna_idprop_ui_prop_get(elimb_p, "stretch", create=True)
-        elimb_p["stretch"] = 1.0
+        prop = rna_idprop_ui_prop_get(elimb_p, "stretch_length", create=True)
+        elimb_p["stretch_length"] = 1.0
         prop["min"] = 0.05
         prop["max"] = 20.0
         prop["soft_min"] =  0.25
         prop["soft_max"] = 4.0
         
+        prop = rna_idprop_ui_prop_get(elimb_p, "auto_stretch", create=True)
+        elimb_p["auto_stretch"] = 1.0
+        prop["soft_min"] = prop["min"] = 0.0
+        prop["soft_max"] = prop["max"] = 1.0
+        
         # Stretch parameter drivers
         def add_stretch_drivers(pose_bone):
             driver = pose_bone.driver_add("scale", 1).driver
             var = driver.variables.new()
-            var.name = "stretch"
+            var.name = "stretch_length"
             var.targets[0].id_type = 'OBJECT'
             var.targets[0].id = self.obj
-            var.targets[0].data_path = elimb_p.path_from_id() + '["stretch"]'
+            var.targets[0].data_path = elimb_p.path_from_id() + '["stretch_length"]'
             driver.type = 'SCRIPTED'
-            driver.expression = "stretch"
+            driver.expression = "stretch_length"
             
             driver = pose_bone.driver_add("scale", 0).driver
             var = driver.variables.new()
-            var.name = "stretch"
+            var.name = "stretch_length"
             var.targets[0].id_type = 'OBJECT'
             var.targets[0].id = self.obj
-            var.targets[0].data_path = elimb_p.path_from_id() + '["stretch"]'
+            var.targets[0].data_path = elimb_p.path_from_id() + '["stretch_length"]'
             driver.type = 'SCRIPTED'
-            driver.expression = "stretch"
+            driver.expression = "stretch_length"
             
             driver = pose_bone.driver_add("scale", 2).driver
             var = driver.variables.new()
-            var.name = "stretch"
+            var.name = "stretch_length"
             var.targets[0].id_type = 'OBJECT'
             var.targets[0].id = self.obj
-            var.targets[0].data_path = elimb_p.path_from_id() + '["stretch"]'
+            var.targets[0].data_path = elimb_p.path_from_id() + '["stretch_length"]'
             driver.type = 'SCRIPTED'
-            driver.expression = "stretch"
-        add_stretch_drivers(ulimb_p)
+            driver.expression = "stretch_length"
+        add_stretch_drivers(ulimb_nostr_p)
 
         # Bend direction hint
-        if self.bend_hint:
-            con = flimb_p.constraints.new('LIMIT_ROTATION')
+        def add_bend_hint(pose_bone, axis):
+            con = pose_bone.constraints.new('LIMIT_ROTATION')
             con.name = "bend_hint"
             con.owner_space = 'LOCAL'
-            if self.primary_rotation_axis == 'X':
+            if axis == 'X':
                 con.use_limit_x = True
                 con.min_x = pi / 10
                 con.max_x = pi / 10
-            elif self.primary_rotation_axis == '-X':
+            elif axis == '-X':
                 con.use_limit_x = True
                 con.min_x = -pi / 10
                 con.max_x = -pi / 10
-            elif self.primary_rotation_axis == 'Y':
+            elif axis == 'Y':
                 con.use_limit_y = True
                 con.min_y = pi / 10
                 con.max_y = pi / 10
-            elif self.primary_rotation_axis == '-Y':
+            elif axis == '-Y':
                 con.use_limit_y = True
                 con.min_y = -pi / 10
                 con.max_y = -pi / 10
-            elif self.primary_rotation_axis == 'Z':
+            elif axis == 'Z':
                 con.use_limit_z = True
                 con.min_z = pi / 10
                 con.max_z = pi / 10
-            elif self.primary_rotation_axis == '-Z':
+            elif axis == '-Z':
                 con.use_limit_z = True
                 con.min_z = -pi / 10
                 con.max_z = -pi / 10
+        if self.bend_hint:
+            add_bend_hint(flimb_p, self.primary_rotation_axis)
+            add_bend_hint(flimb_nostr_p, self.primary_rotation_axis)
+        
+        # Constrain normal IK chain to no-stretch IK chain
+        con = ulimb_p.constraints.new('COPY_TRANSFORMS')
+        con.name = "pre_stretch"
+        con.target = self.obj
+        con.subtarget = ulimb_nostr
+        
+        con = flimb_p.constraints.new('COPY_TRANSFORMS')
+        con.name = "pre_stretch"
+        con.target = self.obj
+        con.subtarget = flimb_nostr
 
-        # IK Constraint
-        con = flimb_p.constraints.new('IK')
+        # IK Constraints
+        con = flimb_nostr_p.constraints.new('IK')
         con.name = "ik"
         con.target = self.obj
         con.subtarget = elimb_mch
@@ -540,6 +577,22 @@ class IKLimb:
         con.pole_subtarget = pole
         con.pole_angle = pole_offset
         con.chain_count = 2
+        
+        con = flimb_p.constraints.new('IK')
+        con.name = "ik"
+        con.target = self.obj
+        con.subtarget = elimb_mch
+        con.chain_count = 2
+        
+        # Driver to enable/disable auto stretching IK chain
+        fcurve = con.driver_add("influence")
+        driver = fcurve.driver
+        var = driver.variables.new()
+        driver.type = 'AVERAGE'
+        var.name = "var"
+        var.targets[0].id_type = 'OBJECT'
+        var.targets[0].id = self.obj
+        var.targets[0].data_path = elimb_p.path_from_id() + '["auto_stretch"]'
         
         # Stretch bone constraints
         con = ulimb_str_p.constraints.new('COPY_TRANSFORMS')
