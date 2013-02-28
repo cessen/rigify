@@ -612,6 +612,7 @@ class IKLimb:
         con.subtarget = ulimb
         con = ulimb_str_p.constraints.new('MAINTAIN_VOLUME')
         con.name = "stretch"
+        con.owner_space = 'LOCAL'
         
         con = flimb_str_p.constraints.new('COPY_TRANSFORMS')
         con.name = "anchor"
@@ -619,6 +620,7 @@ class IKLimb:
         con.subtarget = flimb
         con = flimb_str_p.constraints.new('MAINTAIN_VOLUME')
         con.name = "stretch"
+        con.owner_space = 'LOCAL'
         
         # Constrain org bones
         con = pb[self.org_bones[0]].constraints.new('COPY_TRANSFORMS')
