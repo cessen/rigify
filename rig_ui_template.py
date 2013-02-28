@@ -282,7 +282,8 @@ def fk2ik_leg(obj, fk, ik):
     mfoot  = obj.pose.bones[fk[3]]
     thighi = obj.pose.bones[ik[0]]
     shini  = obj.pose.bones[ik[1]]
-    mfooti = obj.pose.bones[ik[2]]
+    footi  = obj.pose.bones[ik[2]]
+    mfooti = obj.pose.bones[ik[3]]
 
     # Stretch
     diff = (thighi.vector.length + shini.vector.length) / (thigh.vector.length + shin.vector.length)
