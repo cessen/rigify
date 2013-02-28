@@ -208,7 +208,7 @@ def match_pole_target(ik_first, ik_last, pole, match_bone, length):
         q1 = ik_first.matrix.to_quaternion()
         q2 = match_bone.matrix.to_quaternion()
         angle2 = acos(min(1,max(-1,q1.dot(q2)))) * 2
-        if angle2 > 0.0001:
+        if angle2 > angle:
             # Compensate in the other direction
             pv = Matrix.Rotation((angle*(-2)), 4, ikv).to_quaternion() * pv
             set_pole(pv)
