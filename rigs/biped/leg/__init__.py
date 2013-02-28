@@ -30,6 +30,7 @@ script = """
 fk_leg = ["%s", "%s", "%s", "%s"]
 ik_leg = ["%s", "%s", "%s", "%s", "%s", "%s"]
 if is_selected(fk_leg+ik_leg):
+    layout.prop(pose_bones[ik_leg[2]], '["ikfk_switch"]', text="FK / IK (" + ik_leg[2] + ")", slider=True)
     p = layout.operator("pose.rigify_leg_fk2ik_" + rig_id, text="Snap FK->IK (" + fk_leg[0] + ")")
     p.thigh_fk = fk_leg[0]
     p.shin_fk  = fk_leg[1]
@@ -49,7 +50,6 @@ if is_selected(fk_leg+ik_leg):
     p.pole      = ik_leg[3]
     p.footroll  = ik_leg[4]
     p.mfoot_ik  = ik_leg[5]
-    layout.prop(pose_bones[ik_leg[2]], '["ikfk_switch"]', text="FK / IK (" + ik_leg[2] + ")", slider=True)
 if is_selected(fk_leg):
     try:
         pose_bones[fk_leg[0]]["isolate"]

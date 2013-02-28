@@ -30,6 +30,7 @@ script = """
 fk_arm = ["%s", "%s", "%s"]
 ik_arm = ["%s", "%s", "%s", "%s"]
 if is_selected(fk_arm+ik_arm):
+    layout.prop(pose_bones[ik_arm[2]], '["ikfk_switch"]', text="FK / IK (" + ik_arm[2] + ")", slider=True)
     props = layout.operator("pose.rigify_arm_fk2ik_" + rig_id, text="Snap FK->IK (" + fk_arm[0] + ")")
     props.uarm_fk = fk_arm[0]
     props.farm_fk = fk_arm[1]
@@ -45,7 +46,6 @@ if is_selected(fk_arm+ik_arm):
     props.farm_ik = ik_arm[1]
     props.hand_ik = ik_arm[2]
     props.pole = ik_arm[3]
-    layout.prop(pose_bones[ik_arm[2]], '["ikfk_switch"]', text="FK / IK (" + ik_arm[2] + ")", slider=True)
 if is_selected(fk_arm):
     try:
         pose_bones[fk_arm[0]]["isolate"]

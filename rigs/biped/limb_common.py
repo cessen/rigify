@@ -803,6 +803,13 @@ class RubberHoseLimb:
         else:
             # Complex rig
             
+            # Get the .R or .L off the end of the upper limb name if it exists
+            lr = self.org_bones[0].split(".", 1)  
+            if len(lr) == 1:
+                lr = ""
+            else:
+                lr = lr[1]
+            
             # Create bones
             ulimb1 = copy_bone(self.obj, self.org_bones[0], make_deformer_name(strip_org(insert_before_lr(self.org_bones[0], ".01"))))
             ulimb2 = copy_bone(self.obj, self.org_bones[0], make_deformer_name(strip_org(insert_before_lr(self.org_bones[0], ".02"))))
@@ -813,16 +820,20 @@ class RubberHoseLimb:
             junc = copy_bone(self.obj, self.org_bones[1], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[1], ".junc"))))
             
             uhose = new_bone(self.obj, strip_org(insert_before_lr(self.org_bones[0], "_hose")))
-            lr = self.org_bones[0].split(".", 1)  # Get the .R or .L off the end of the name if it exists
-            if len(lr) == 1:
-                lr = ""
-            else:
-                lr = lr[1]
             jhose = new_bone(self.obj, self.junc_base_name + "_hose." + lr)
             fhose = new_bone(self.obj, strip_org(insert_before_lr(self.org_bones[1], "_hose")))
         
+            uhose_par = copy_bone(self.obj, self.org_bones[0], make_mechanism_name(strip_org(insert_before_lr(uhose, "_parent"))))
+            jhose_par = copy_bone(self.obj, junc, make_mechanism_name(strip_org(insert_before_lr(jhose, "_parent"))))
+            fhose_par = copy_bone(self.obj, self.org_bones[1], make_mechanism_name(strip_org(insert_before_lr(fhose, "_parent"))))
+        
             # Get edit bones
             eb = self.obj.data.edit_bones
+
+            if parent != None:
+                parent_e = eb[parent]
+            else:
+                parent_e = None
 
             ulimb1_e = eb[ulimb1]
             ulimb2_e = eb[ulimb2]
@@ -835,11 +846,15 @@ class RubberHoseLimb:
             uhose_e = eb[uhose]
             jhose_e = eb[jhose]
             fhose_e = eb[fhose]
+            
+            uhose_par_e = eb[uhose_par]
+            jhose_par_e = eb[jhose_par]
+            fhose_par_e = eb[fhose_par]
         
             # Parenting
             if parent != None:
                 ulimb1_e.use_connect = False
-                ulimb1_e.parent = eb[parent]
+                ulimb1_e.parent = parent_e
             
             ulimb2_e.use_connect = False
             ulimb2_e.parent = eb[self.org_bones[0]]
@@ -857,13 +872,22 @@ class RubberHoseLimb:
             junc_e.parent = eb[self.org_bones[0]]
             
             uhose_e.use_connect = False
-            uhose_e.parent = eb[self.org_bones[0]]
+            uhose_e.parent = uhose_par_e
             
             jhose_e.use_connect = False
-            jhose_e.parent = junc_e
+            jhose_e.parent = jhose_par_e
             
             fhose_e.use_connect = False
-            fhose_e.parent = eb[self.org_bones[1]]
+            fhose_e.parent = fhose_par_e
+            
+            uhose_par_e.use_connect = False
+            uhose_par_e.parent = parent_e
+            
+            jhose_par_e.use_connect = False
+            jhose_par_e.parent = parent_e
+            
+            fhose_par_e.use_connect = False
+            fhose_par_e.parent = parent_e
             
             # Positioning
             ulimb1_e.length *= 0.5
@@ -873,6 +897,13 @@ class RubberHoseLimb:
             align_bone_roll(self.obj, flimb2, elimb)
             
             junc_e.length *= 0.2
+            
+            uhose_par_e.length *= 0.25
+            jhose_par_e.length *= 0.15
+            fhose_par_e.length *= 0.25
+            put_bone(self.obj, uhose_par, Vector(ulimb1_e.tail))
+            put_bone(self.obj, jhose_par, Vector(ulimb2_e.tail))
+            put_bone(self.obj, fhose_par, Vector(flimb1_e.tail))
             
             put_bone(self.obj, uhose, Vector(ulimb1_e.tail))
             put_bone(self.obj, jhose, Vector(ulimb2_e.tail))
@@ -927,6 +958,10 @@ class RubberHoseLimb:
             uhose_p = pb[uhose]
             jhose_p = pb[jhose]
             fhose_p = pb[fhose]
+            
+            uhose_par_p = pb[uhose_par]
+            jhose_par_p = pb[jhose_par]
+            fhose_par_p = pb[fhose_par]
             
             # Lock axes
             uhose_p.lock_rotation = (True, True, True)
@@ -1045,6 +1080,50 @@ class RubberHoseLimb:
             con.target = self.obj
             con.subtarget = self.org_bones[1]
             con.influence = 0.5
+            
+            con = uhose_par_p.constraints.new('COPY_ROTATION')
+            con.name = "follow"
+            con.target = self.obj
+            con.subtarget = self.org_bones[0]
+            con.influence = 1.0
+            con = uhose_par_p.constraints.new('COPY_LOCATION')
+            con.name = "anchor"
+            con.target = self.obj
+            con.subtarget = self.org_bones[0]
+            con.influence = 1.0
+            con = uhose_par_p.constraints.new('COPY_LOCATION')
+            con.name = "anchor"
+            con.target = self.obj
+            con.subtarget = jhose
+            con.influence = 0.5
+            
+            con = jhose_par_p.constraints.new('COPY_ROTATION')
+            con.name = "follow"
+            con.target = self.obj
+            con.subtarget = junc
+            con.influence = 1.0
+            con = jhose_par_p.constraints.new('COPY_LOCATION')
+            con.name = "anchor"
+            con.target = self.obj
+            con.subtarget = junc
+            con.influence = 1.0
+            
+            con = fhose_par_p.constraints.new('COPY_ROTATION')
+            con.name = "follow"
+            con.target = self.obj
+            con.subtarget = self.org_bones[1]
+            con.influence = 1.0
+            con = fhose_par_p.constraints.new('COPY_LOCATION')
+            con.name = "anchor"
+            con.target = self.obj
+            con.subtarget = jhose
+            con.influence = 1.0
+            con = fhose_par_p.constraints.new('COPY_LOCATION')
+            con.name = "anchor"
+            con.target = self.obj
+            con.subtarget = self.org_bones[2]
+            con.influence = 0.5
+            
             
             # Layers
             if self.layers:
