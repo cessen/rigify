@@ -30,6 +30,49 @@ class Rig:
         if len(self.org_bones) <= 1:
             raise MetarigError("RIGIFY ERROR: Bone '%s': listen bro, that finger rig jusaint put tugetha rite. A little hint, use more than one bone!!" % (strip_org(bone_name)))            
 
+    def make_palm(self, master_name, ctrl_first, mch_first, mch_drv_first):
+
+        bpy.ops.object.mode_set(mode ='EDIT')
+        eb = self.obj.data.edit_bones
+
+        name      = self.palm
+        ctrl_name = strip_org(name)
+        
+        # Create control bone
+        ctrl_bone   = copy_bone(self.obj, name, ctrl_name )
+        ctrl_bone_e = eb[ctrl_name]
+
+        # Making the master bone child of the palm
+        ctrl_bone_master = eb[master_name]
+        ctrl_bone_master.parent  = ctrl_bone_e
+        eb[mch_first].parent     = ctrl_bone_e
+        eb[mch_drv_first].parent = ctrl_bone_e
+
+        # Create deformation bone
+        def_name   = make_deformer_name(ctrl_name)
+        def_bone   = copy_bone(self.obj, name, def_name )
+
+        def_bone_e        = eb[def_bone]
+        def_bone_e.parent = eb[ctrl_bone]
+
+        bpy.ops.object.mode_set(mode ='OBJECT')
+
+        pb = self.obj.pose.bones
+
+        # Constraining the deform bone
+        con           = pb[def_bone].constraints.new('DAMPED_TRACK')
+        con.target    = self.obj
+        con.subtarget = ctrl_first
+
+        con           = pb[def_bone].constraints.new('STRETCH_TO')
+        con.target    = self.obj
+        con.subtarget = ctrl_first
+        con.volume    = 'NO_VOLUME'
+
+        # Assigning shapes to control bones
+        create_circle_widget(self.obj, ctrl_bone, radius=0.3, head_tail=0.5)
+
+
     def generate(self):
         bpy.ops.object.mode_set(mode ='EDIT')
         eb = self.obj.data.edit_bones
@@ -296,50 +339,12 @@ class Rig:
         create_sphere_widget(self.obj, tip_name)
         
         if not self.params.thumb:
-            self.make_palm(master_name)
+            self.make_palm(master_name, ctrl_chain[0], mch_chain[0], mch_drv_chain[0])
         
         # Create UI
         controls_string = ", ".join(["'" + x + "'" for x in ctrl_chain]) + ", " + "'" + master_name + "'"
         return [script % (controls_string, self.obj.name, master_name, 'finger_curve')]
-            
-    def make_palm(self, master_name):
-        
-        bpy.ops.object.mode_set(mode ='EDIT')
-        eb = self.obj.data.edit_bones
-        
-        name      = self.palm
-        ctrl_name = strip_org(name)
-        
-        # Create control bone
-        ctrl_bone   = copy_bone(self.obj, name, ctrl_name )
-        ctrl_bone_e = eb[ctrl_name]
-        
-        # Making the master bone child of the palm
-        ctrl_bone_master = eb[master_name]
-        ctrl_bone_master.parent = ctrl_bone_e 
-        
-        # Create deformation bone
-        def_name   = make_deformer_name(ctrl_name)
-        def_bone   = copy_bone(self.obj, name, def_name )
-        def_bone_e = eb[def_bone]
-        def_bone_e.parent = ctrl_bone_e
-        
-        bpy.ops.object.mode_set(mode ='OBJECT')
-        
-        pb = self.obj.pose.bones
-        
-        # Constraining the deform bone
-        con           = pb[def_bone].constraints.new('DAMPED_TRACK')
-        con.target    = self.obj
-        con.subtarget = ctrl_chain[0]
-        
-        con           = pb[def_bone].constraints.new('STRETCH_TO')
-        con.target    = self.obj
-        con.subtarget = ctrl_chain[0]
-        con.volume    = 'NO_VOLUME'
-        
-        # Assigning shapes to control bones
-        create_circle_widget(self.obj, pb[ctrl_bone], radius=0.3, head_tail=0.5)
+           
 
         
 def add_parameters(params):
