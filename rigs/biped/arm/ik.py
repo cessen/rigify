@@ -19,17 +19,13 @@
 # <pep8 compliant>
 
 import bpy
-from rna_prop_ui import rna_idprop_ui_prop_get
-from mathutils import Vector
 
 from .. import limb_common
 
 from ....utils import MetarigError
-from ....utils import angle_on_plane
-from ....utils import copy_bone
 from ....utils import connected_children_names
-from ....utils import strip_org, make_mechanism_name, insert_before_lr
-from ....utils import create_widget, create_line_widget, create_sphere_widget
+from ....utils import strip_org
+from ....utils import create_widget
 
 
 class Rig:
@@ -61,10 +57,9 @@ class Rig:
         bend_hint = params.bend_hint
         primary_rotation_axis = params.primary_rotation_axis
         pole_target_base_name = self.params.elbow_base_name + "_target"
-        
+
         # Arm is based on common limb
         self.ik_limb = limb_common.IKLimb(obj, self.org_bones[0], self.org_bones[1], self.org_bones[2], pole_target_base_name, primary_rotation_axis, bend_hint, layers, ikfk_switch)
-
 
     def generate(self):
         """ Generate the rig.
@@ -76,11 +71,11 @@ class Rig:
         uarm = bone_list[0]
         farm = bone_list[1]
         hand = bone_list[2]
-        hand_mch = bone_list[3]
+        # hand_mch = bone_list[3]
         pole = bone_list[4]
-        vispole = bone_list[5]
-        vishand = bone_list[6]
-        
+        # vispole = bone_list[5]
+        # vishand = bone_list[6]
+
         ob = create_widget(self.obj, hand)
         if ob != None:
             verts = [(0.7, 1.5, 0.0), (0.7, -0.25, 0.0), (-0.7, -0.25, 0.0), (-0.7, 1.5, 0.0), (0.7, 0.723, 0.0), (-0.7, 0.723, 0.0), (0.7, 0.0, 0.0), (-0.7, 0.0, 0.0)]

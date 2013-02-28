@@ -22,8 +22,11 @@ import bpy
 
 from .. import limb_common
 
+from ....utils import MetarigError
 from ....utils import connected_children_names
-from ....utils import create_widget, create_limb_widget
+from ....utils import create_widget
+from ....utils import strip_org
+from ....utils import get_layers
 
 
 class Rig:
@@ -39,21 +42,21 @@ class Rig:
 
         """
         self.obj = obj
-        
+
         # Get the chain of 3 connected bones
         self.org_bones = [bone] + connected_children_names(self.obj, bone)[:2]
 
         if len(self.org_bones) != 3:
             raise MetarigError("RIGIFY ERROR: Bone '%s': input to rig type must be a chain of at least 3 bones" % (strip_org(bone)))
 
-        # Get params        
+        # Get params
         if "layers" in params:
             layers = get_layers(params["layers"])
         else:
             layers = None
-        
+
         primary_rotation_axis = params.primary_rotation_axis
-        
+
         # Arm is based on common limb
         self.fk_limb = limb_common.FKLimb(obj, self.org_bones[0], self.org_bones[1], self.org_bones[2], primary_rotation_axis, layers)
 
@@ -67,7 +70,7 @@ class Rig:
         uarm = bone_list[0]
         farm = bone_list[1]
         hand = bone_list[2]
-        
+
         # Create hand widget
         ob = create_widget(self.obj, hand)
         if ob != None:

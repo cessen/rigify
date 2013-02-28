@@ -42,7 +42,7 @@ def perpendicular_vector(v):
         tv = Vector((1,0,0))
     else:
         tv = Vector((0,1,0))
-    
+
     # Use cross prouct to generate a vector perpendicular to
     # both tv and (more importantly) v.
     return v.cross(tv)
@@ -222,11 +222,11 @@ def match_pole_target(ik_first, ik_last, pole, match_bone, length):
     pv1 = Matrix.Rotation(angle, 4, ikv) * pv
     set_pole(pv1)
     ang1 = rotation_difference(ik_first.matrix, match_bone.matrix)
-    
+
     pv2 = Matrix.Rotation(-angle, 4, ikv) * pv
     set_pole(pv2)
     ang2 = rotation_difference(ik_first.matrix, match_bone.matrix)
-    
+
     # Do the one with the smaller angle
     if ang1 < ang2:
         set_pole(pv1)
@@ -244,7 +244,7 @@ def fk2ik_arm(obj, fk, ik):
     uarmi = obj.pose.bones[ik[0]]
     farmi = obj.pose.bones[ik[1]]
     handi = obj.pose.bones[ik[2]]
-    
+
     # Stretch
     if handi['auto_stretch'] == 0.0:
         uarm['stretch_length'] = handi['stretch_length']

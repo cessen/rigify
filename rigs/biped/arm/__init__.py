@@ -83,7 +83,7 @@ class Rig:
         """
         self.obj = obj
         self.params = params
-        
+
         # Gather deform rig
         self.deform_rig = deform.Rig(obj, bone, params)
 
@@ -116,7 +116,7 @@ def add_parameters(params):
     """
     params.use_complex_arm = bpy.props.BoolProperty(name="Complex Arm Rig", default=True, description="Generate the full, complex arm rig with twist bones and rubber-hose controls")
     params.bend_hint = bpy.props.BoolProperty(name="Bend Hint", default=True, description="Give IK chain a hint about which way to bend.  Useful for perfectly straight chains")
-    
+
     items = [('X', 'X', ''), ('Y', 'Y', ''), ('Z', 'Z', ''), ('-X', '-X', ''), ('-Y', '-Y', ''), ('-Z', '-Z', '')]
     params.primary_rotation_axis = bpy.props.EnumProperty(items=items, name="Primary Rotation Axis", default='X')
 
@@ -127,7 +127,7 @@ def add_parameters(params):
 
     params.separate_hose_layers = bpy.props.BoolProperty(name="Separate Rubber-hose Control Layers:", default=False, description="Enable putting the rubber-hose controls on a separate layer from the other controls")
     params.hose_layers = bpy.props.BoolVectorProperty(size=32, description="Layers for the rubber-hose controls to be on")
-    
+
 
 def parameters_ui(layout, params):
     """ Create the ui for the rig parameters.
@@ -135,17 +135,17 @@ def parameters_ui(layout, params):
     """
     col = layout.column()
     col.prop(params, "use_complex_arm")
-    
+
     r = layout.row()
     r.label(text="Elbow rotation axis:")
     r.prop(params, "primary_rotation_axis", text="")
-    
+
     r = layout.row()
     r.prop(params, "elbow_base_name")
-    
+
     r = layout.row()
     r.prop(params, "bend_hint")
-    
+
     r = layout.row()
     r.prop(params, "separate_ik_layers")
 
@@ -191,11 +191,11 @@ def parameters_ui(layout, params):
     row.prop(params, "ik_layers", index=29, toggle=True, text="")
     row.prop(params, "ik_layers", index=30, toggle=True, text="")
     row.prop(params, "ik_layers", index=31, toggle=True, text="")
-    
+
     if params.use_complex_arm:
         r = layout.row()
         r.prop(params, "separate_hose_layers")
-        
+
         r = layout.row()
         r.active = params.separate_hose_layers
 
