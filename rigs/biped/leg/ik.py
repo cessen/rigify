@@ -18,10 +18,7 @@
 
 # <pep8 compliant>
 
-from math import pi, acos
-
 import bpy
-from rna_prop_ui import rna_idprop_ui_prop_get
 from mathutils import Vector
 
 from .. import limb_common
@@ -31,7 +28,7 @@ from ....utils import align_bone_x_axis
 from ....utils import copy_bone, flip_bone, put_bone
 from ....utils import connected_children_names, has_connected_children
 from ....utils import strip_org, make_mechanism_name, insert_before_lr
-from ....utils import create_widget, create_line_widget, create_sphere_widget, create_circle_widget
+from ....utils import create_widget, create_circle_widget
 
 
 class Rig:
@@ -92,10 +89,9 @@ class Rig:
         bend_hint = params.bend_hint
         primary_rotation_axis = params.primary_rotation_axis
         pole_target_base_name = self.params.knee_base_name + "_target"
-        
+
         # Leg is based on common limb
         self.ik_limb = limb_common.IKLimb(obj, self.org_bones[0], self.org_bones[1], self.org_bones[2], pole_target_base_name, primary_rotation_axis, bend_hint, self.layers, ikfk_switch)
-
 
     def generate(self):
         """ Generate the rig.
@@ -109,15 +105,15 @@ class Rig:
         foot = bone_list[2]
         foot_mch = bone_list[3]
         pole = bone_list[4]
-        vispole = bone_list[5]
-        visfoot = bone_list[6]
-        
+        # vispole = bone_list[5]
+        # visfoot = bone_list[6]
+
         # Build IK foot rig
         bpy.ops.object.mode_set(mode='EDIT')
         make_rocker = False
         if self.org_bones[5] is not None:
             make_rocker = True
-            
+
         # Create the bones
         toe = copy_bone(self.obj, self.org_bones[3], strip_org(self.org_bones[3]))
         toe_parent = copy_bone(self.obj, self.org_bones[2], make_mechanism_name(strip_org(self.org_bones[3] + ".parent")))
@@ -148,7 +144,7 @@ class Rig:
         if make_rocker:
             rocker1_e = eb[rocker1]
             rocker2_e = eb[rocker2]
-        
+
         # Parenting
         foot_ik_target_e.use_connect = False
         foot_ik_target_e.parent = roll2_e
@@ -177,7 +173,7 @@ class Rig:
             roll1_e.parent = rocker2_e
             rocker2_e.parent = rocker1_e
             rocker1_e.parent = foot_e
-            
+
         # Positioning
         vec = Vector(toe_e.vector)
         vec.normalize()
@@ -225,9 +221,9 @@ class Rig:
             rocker1_p = pb[rocker1]
             rocker2_p = pb[rocker2]
         toe_p = pb[toe]
-        toe_parent_p = pb[toe_parent]
+        # toe_parent_p = pb[toe_parent]
         toe_parent_socket1_p = pb[toe_parent_socket1]
-        
+
         # Foot roll control only rotates on x-axis, or x and y if rocker.
         foot_roll_p.rotation_mode = 'XYZ'
         if make_rocker:
@@ -243,7 +239,7 @@ class Rig:
         if make_rocker:
             rocker1_p.rotation_mode = 'XYZ'
             rocker2_p.rotation_mode = 'XYZ'
-        
+
         # toe_parent constraint
         con = toe_parent_socket1_p.constraints.new('COPY_LOCATION')
         con.name = "copy_location"
@@ -314,18 +310,18 @@ class Rig:
             var.targets[0].id_type = 'OBJECT'
             var.targets[0].id = self.obj
             var.targets[0].data_path = foot_roll_p.path_from_id() + '.rotation_euler[1]'
-        
+
         # Constrain toe bone to toe control
         con = pb[self.org_bones[3]].constraints.new('COPY_TRANSFORMS')
         con.name = "copy_transforms"
         con.target = self.obj
         con.subtarget = toe
-        
+
         # Set layers if specified
         if self.layers:
             foot_roll_p.bone.layers = self.layers
             toe_p.bone.layers = [(i[0] or i[1]) for i in zip(toe_p.bone.layers, self.layers)]  # Both FK and IK layers
-        
+
         # Create widgets
         create_circle_widget(self.obj, toe, radius=0.7, head_tail=0.5)
 
@@ -339,7 +335,7 @@ class Rig:
 
             mod = ob.modifiers.new("subsurf", 'SUBSURF')
             mod.levels = 2
-            
+
         ob = create_widget(self.obj, foot)
         if ob != None:
             verts = [(0.7, 1.5, 0.0), (0.7, -0.25, 0.0), (-0.7, -0.25, 0.0), (-0.7, 1.5, 0.0), (0.7, 0.723, 0.0), (-0.7, 0.723, 0.0), (0.7, 0.0, 0.0), (-0.7, 0.0, 0.0)]

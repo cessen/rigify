@@ -19,17 +19,15 @@
 # <pep8 compliant>
 
 import bpy
-from rna_prop_ui import rna_idprop_ui_prop_get
 from mathutils import Vector
 
 from .. import limb_common
 
 from ....utils import MetarigError
-from ....utils import copy_bone
 from ....utils import connected_children_names, has_connected_children
-from ....utils import strip_org, make_mechanism_name, insert_before_lr
+from ....utils import strip_org
 from ....utils import get_layers
-from ....utils import create_widget, create_limb_widget
+from ....utils import create_widget
 
 
 class Rig:
@@ -89,9 +87,9 @@ class Rig:
             layers = get_layers(params["layers"])
         else:
             layers = None
-        
+
         primary_rotation_axis = params.primary_rotation_axis
-        
+
         # Leg is based on common limb
         self.fk_limb = limb_common.FKLimb(obj, self.org_bones[0], self.org_bones[1], self.org_bones[2], primary_rotation_axis, layers)
 
@@ -106,7 +104,7 @@ class Rig:
         shin = ctrl_bones[1]
         foot = ctrl_bones[2]
         foot_mch = ctrl_bones[3]
-        
+
         # Position foot control
         bpy.ops.object.mode_set(mode='EDIT')
         eb = self.obj.data.edit_bones

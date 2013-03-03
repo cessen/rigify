@@ -22,12 +22,10 @@ import bpy
 from rna_prop_ui import rna_idprop_ui_prop_get
 from mathutils import Vector
 
-from ...utils import MetarigError
 from ...utils import angle_on_plane, align_bone_roll, align_bone_z_axis
 from ...utils import new_bone, copy_bone, put_bone, make_nonscaling_child
 from ...utils import strip_org, make_mechanism_name, make_deformer_name, insert_before_lr
-from ...utils import get_layers
-from ...utils import create_widget, create_limb_widget, create_line_widget, create_sphere_widget, create_circle_widget
+from ...utils import create_widget, create_limb_widget, create_line_widget, create_sphere_widget
 
 
 class FKLimb:
@@ -48,7 +46,7 @@ class FKLimb:
 
     def generate(self):
         bpy.ops.object.mode_set(mode='EDIT')
-        
+
         # Create non-scaling parent bone
         if self.org_parent != None:
             loc = Vector(self.obj.data.edit_bones[self.org_bones[0]].head)
@@ -79,10 +77,10 @@ class FKLimb:
         ulimb_e = eb[ulimb]
         flimb_e = eb[flimb]
         elimb_e = eb[elimb]
-        
+
         fantistr_e = eb[fantistr]
         eantistr_e = eb[eantistr]
-        
+
         elimb_mch_e = eb[elimb_mch]
 
         if parent != None:
@@ -92,35 +90,35 @@ class FKLimb:
         # Parenting
         elimb_mch_e.use_connect = False
         elimb_mch_e.parent = elimb_e
-        
+
         elimb_e.use_connect = False
         elimb_e.parent = eantistr_e
-        
+
         eantistr_e.use_connect = False
         eantistr_e.parent = flimb_e
-        
+
         flimb_e.use_connect = False
         flimb_e.parent = fantistr_e
-        
+
         fantistr_e.use_connect = False
         fantistr_e.parent = ulimb_e
 
         if parent != None:
             socket1_e.use_connect = False
             socket1_e.parent = eb[parent]
-            
+
             socket2_e.use_connect = False
             socket2_e.parent = None
-            
+
             ulimb_e.use_connect = False
             ulimb_e.parent = socket2_e
-            
+
         # Positioning
         fantistr_e.length /= 8
         put_bone(self.obj, fantistr, Vector(ulimb_e.tail))
         eantistr_e.length /= 8
         put_bone(self.obj, eantistr, Vector(flimb_e.tail))
-        
+
         if parent != None:
             socket1_e.length /= 4
             socket2_e.length /= 3
@@ -132,8 +130,7 @@ class FKLimb:
         ulimb_p = pb[ulimb]
         flimb_p = pb[flimb]
         elimb_p = pb[elimb]
-        elimb_mch_p = pb[elimb_mch]
-        
+
         fantistr_p = pb[fantistr]
         eantistr_p = pb[eantistr]
 
@@ -161,70 +158,70 @@ class FKLimb:
             prop["soft_min"] = prop["min"] = 0.0
             prop["soft_max"] = prop["max"] = 1.0
 
-        prop = rna_idprop_ui_prop_get(ulimb_p, "stretch", create=True)
-        ulimb_p["stretch"] = 1.0
+        prop = rna_idprop_ui_prop_get(ulimb_p, "stretch_length", create=True)
+        ulimb_p["stretch_length"] = 1.0
         prop["min"] = 0.05
         prop["max"] = 20.0
-        prop["soft_min"] =  0.25
+        prop["soft_min"] = 0.25
         prop["soft_max"] = 4.0
 
         # Stretch drivers
         def add_stretch_drivers(pose_bone):
             driver = pose_bone.driver_add("scale", 1).driver
             var = driver.variables.new()
-            var.name = "stretch"
+            var.name = "stretch_length"
             var.targets[0].id_type = 'OBJECT'
             var.targets[0].id = self.obj
-            var.targets[0].data_path = ulimb_p.path_from_id() + '["stretch"]'
+            var.targets[0].data_path = ulimb_p.path_from_id() + '["stretch_length"]'
             driver.type = 'SCRIPTED'
-            driver.expression = "stretch"
-            
+            driver.expression = "stretch_length"
+
             driver = pose_bone.driver_add("scale", 0).driver
             var = driver.variables.new()
-            var.name = "stretch"
+            var.name = "stretch_length"
             var.targets[0].id_type = 'OBJECT'
             var.targets[0].id = self.obj
-            var.targets[0].data_path = ulimb_p.path_from_id() + '["stretch"]'
+            var.targets[0].data_path = ulimb_p.path_from_id() + '["stretch_length"]'
             driver.type = 'SCRIPTED'
-            driver.expression = "1/sqrt(stretch)"
-            
+            driver.expression = "1/sqrt(stretch_length)"
+
             driver = pose_bone.driver_add("scale", 2).driver
             var = driver.variables.new()
-            var.name = "stretch"
+            var.name = "stretch_length"
             var.targets[0].id_type = 'OBJECT'
             var.targets[0].id = self.obj
-            var.targets[0].data_path = ulimb_p.path_from_id() + '["stretch"]'
+            var.targets[0].data_path = ulimb_p.path_from_id() + '["stretch_length"]'
             driver.type = 'SCRIPTED'
-            driver.expression = "1/sqrt(stretch)"
-        
+            driver.expression = "1/sqrt(stretch_length)"
+
         def add_antistretch_drivers(pose_bone):
             driver = pose_bone.driver_add("scale", 1).driver
             var = driver.variables.new()
-            var.name = "stretch"
+            var.name = "stretch_length"
             var.targets[0].id_type = 'OBJECT'
             var.targets[0].id = self.obj
-            var.targets[0].data_path = ulimb_p.path_from_id() + '["stretch"]'
+            var.targets[0].data_path = ulimb_p.path_from_id() + '["stretch_length"]'
             driver.type = 'SCRIPTED'
-            driver.expression = "1/stretch"
-            
+            driver.expression = "1/stretch_length"
+
             driver = pose_bone.driver_add("scale", 0).driver
             var = driver.variables.new()
-            var.name = "stretch"
+            var.name = "stretch_length"
             var.targets[0].id_type = 'OBJECT'
             var.targets[0].id = self.obj
-            var.targets[0].data_path = ulimb_p.path_from_id() + '["stretch"]'
+            var.targets[0].data_path = ulimb_p.path_from_id() + '["stretch_length"]'
             driver.type = 'SCRIPTED'
-            driver.expression = "sqrt(stretch)"
-            
+            driver.expression = "sqrt(stretch_length)"
+
             driver = pose_bone.driver_add("scale", 2).driver
             var = driver.variables.new()
-            var.name = "stretch"
+            var.name = "stretch_length"
             var.targets[0].id_type = 'OBJECT'
             var.targets[0].id = self.obj
-            var.targets[0].data_path = ulimb_p.path_from_id() + '["stretch"]'
+            var.targets[0].data_path = ulimb_p.path_from_id() + '["stretch_length"]'
             driver.type = 'SCRIPTED'
-            driver.expression = "sqrt(stretch)"
-        
+            driver.expression = "sqrt(stretch_length)"
+
         add_stretch_drivers(ulimb_p)
         add_stretch_drivers(flimb_p)
         add_antistretch_drivers(fantistr_p)
@@ -277,7 +274,7 @@ class FKLimb:
             ulimb_p.bone.layers = self.layers
             flimb_p.bone.layers = self.layers
             elimb_p.bone.layers = self.layers
-        
+
         # Create control widgets
         create_limb_widget(self.obj, ulimb)
         create_limb_widget(self.obj, flimb)
@@ -334,7 +331,10 @@ class IKLimb:
         flimb = copy_bone(self.obj, self.org_bones[1], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[1], ".ik"))))
         elimb = copy_bone(self.obj, self.org_bones[2], strip_org(insert_before_lr(self.org_bones[2], ".ik")))
         elimb_mch = copy_bone(self.obj, self.org_bones[2], make_mechanism_name(strip_org(self.org_bones[2])))
-        
+
+        ulimb_nostr = copy_bone(self.obj, self.org_bones[0], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[0], ".nostr.ik"))))
+        flimb_nostr = copy_bone(self.obj, self.org_bones[1], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[1], ".nostr.ik"))))
+
         ulimb_str = copy_bone(self.obj, self.org_bones[0], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[0], ".stretch.ik"))))
         flimb_str = copy_bone(self.obj, self.org_bones[1], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[1], ".stretch.ik"))))
 
@@ -353,6 +353,8 @@ class IKLimb:
         flimb_e = eb[flimb]
         elimb_e = eb[elimb]
         elimb_mch_e = eb[elimb_mch]
+        ulimb_nostr_e = eb[ulimb_nostr]
+        flimb_nostr_e = eb[flimb_nostr]
         ulimb_str_e = eb[ulimb_str]
         flimb_str_e = eb[flimb_str]
         pole_e = eb[pole]
@@ -361,20 +363,23 @@ class IKLimb:
 
         # Parenting
         ulimb_e.use_connect = False
+        ulimb_nostr_e.use_connect = False
         if parent != None:
             ulimb_e.parent = parent_e
-        
+            ulimb_nostr_e.parent = parent_e
+
         flimb_e.parent = ulimb_e
+        flimb_nostr_e.parent = ulimb_nostr_e
 
         elimb_e.use_connect = False
         elimb_e.parent = None
-        
+
         elimb_mch_e.use_connect = False
         elimb_mch_e.parent = elimb_e
-        
+
         ulimb_str_e.use_connect = False
         ulimb_str_e.parent = ulimb_e.parent
-        
+
         flimb_str_e.use_connect = False
         flimb_str_e.parent = ulimb_e.parent
 
@@ -430,6 +435,8 @@ class IKLimb:
         ulimb_p = pb[ulimb]
         flimb_p = pb[flimb]
         elimb_p = pb[elimb]
+        ulimb_nostr_p = pb[ulimb_nostr]
+        flimb_nostr_p = pb[flimb_nostr]
         ulimb_str_p = pb[ulimb_str]
         flimb_str_p = pb[flimb_str]
         pole_p = pb[pole]
@@ -440,16 +447,34 @@ class IKLimb:
         if 'X' in self.primary_rotation_axis:
             flimb_p.lock_ik_y = True
             flimb_p.lock_ik_z = True
+            flimb_nostr_p.lock_ik_y = True
+            flimb_nostr_p.lock_ik_z = True
         elif 'Y' in self.primary_rotation_axis:
             flimb_p.lock_ik_x = True
             flimb_p.lock_ik_z = True
+            flimb_nostr_p.lock_ik_x = True
+            flimb_nostr_p.lock_ik_z = True
         else:
             flimb_p.lock_ik_x = True
             flimb_p.lock_ik_y = True
-        
+            flimb_nostr_p.lock_ik_x = True
+            flimb_nostr_p.lock_ik_y = True
+
         # Limb stretches
-        ulimb_p.ik_stretch = 0.0001
-        flimb_p.ik_stretch = 0.0001
+        ulimb_nostr_p.ik_stretch = 0.0
+        flimb_nostr_p.ik_stretch = 0.0
+
+        # This next bit is weird.  The values calculated cause
+        # ulimb and flimb to preserve their relative lengths
+        # while stretching.
+        l1 = ulimb_p.length
+        l2 = flimb_p.length
+        if l1 < l2:
+            ulimb_p.ik_stretch = (l1 ** (1 / 3)) / (l2 ** (1 / 3))
+            flimb_p.ik_stretch = 1.0
+        else:
+            ulimb_p.ik_stretch = 1.0
+            flimb_p.ik_stretch = (l2 ** (1 / 3)) / (l1 ** (1 / 3))
 
         # Pole target only translates
         pole_p.lock_location = False, False, False
@@ -463,76 +488,95 @@ class IKLimb:
             elimb_p["ikfk_switch"] = 0.0
             prop["soft_min"] = prop["min"] = 0.0
             prop["soft_max"] = prop["max"] = 1.0
-        
-        prop = rna_idprop_ui_prop_get(elimb_p, "stretch", create=True)
-        elimb_p["stretch"] = 1.0
+
+        prop = rna_idprop_ui_prop_get(elimb_p, "stretch_length", create=True)
+        elimb_p["stretch_length"] = 1.0
         prop["min"] = 0.05
         prop["max"] = 20.0
-        prop["soft_min"] =  0.25
+        prop["soft_min"] = 0.25
         prop["soft_max"] = 4.0
-        
+
+        prop = rna_idprop_ui_prop_get(elimb_p, "auto_stretch", create=True)
+        elimb_p["auto_stretch"] = 1.0
+        prop["soft_min"] = prop["min"] = 0.0
+        prop["soft_max"] = prop["max"] = 1.0
+
         # Stretch parameter drivers
         def add_stretch_drivers(pose_bone):
             driver = pose_bone.driver_add("scale", 1).driver
             var = driver.variables.new()
-            var.name = "stretch"
+            var.name = "stretch_length"
             var.targets[0].id_type = 'OBJECT'
             var.targets[0].id = self.obj
-            var.targets[0].data_path = elimb_p.path_from_id() + '["stretch"]'
+            var.targets[0].data_path = elimb_p.path_from_id() + '["stretch_length"]'
             driver.type = 'SCRIPTED'
-            driver.expression = "stretch"
-            
+            driver.expression = "stretch_length"
+
             driver = pose_bone.driver_add("scale", 0).driver
             var = driver.variables.new()
-            var.name = "stretch"
+            var.name = "stretch_length"
             var.targets[0].id_type = 'OBJECT'
             var.targets[0].id = self.obj
-            var.targets[0].data_path = elimb_p.path_from_id() + '["stretch"]'
+            var.targets[0].data_path = elimb_p.path_from_id() + '["stretch_length"]'
             driver.type = 'SCRIPTED'
-            driver.expression = "stretch"
-            
+            driver.expression = "stretch_length"
+
             driver = pose_bone.driver_add("scale", 2).driver
             var = driver.variables.new()
-            var.name = "stretch"
+            var.name = "stretch_length"
             var.targets[0].id_type = 'OBJECT'
             var.targets[0].id = self.obj
-            var.targets[0].data_path = elimb_p.path_from_id() + '["stretch"]'
+            var.targets[0].data_path = elimb_p.path_from_id() + '["stretch_length"]'
             driver.type = 'SCRIPTED'
-            driver.expression = "stretch"
-        add_stretch_drivers(ulimb_p)
+            driver.expression = "stretch_length"
+        add_stretch_drivers(ulimb_nostr_p)
 
         # Bend direction hint
-        if self.bend_hint:
-            con = flimb_p.constraints.new('LIMIT_ROTATION')
+        def add_bend_hint(pose_bone, axis):
+            con = pose_bone.constraints.new('LIMIT_ROTATION')
             con.name = "bend_hint"
             con.owner_space = 'LOCAL'
-            if self.primary_rotation_axis == 'X':
+            if axis == 'X':
                 con.use_limit_x = True
                 con.min_x = pi / 10
                 con.max_x = pi / 10
-            elif self.primary_rotation_axis == '-X':
+            elif axis == '-X':
                 con.use_limit_x = True
                 con.min_x = -pi / 10
                 con.max_x = -pi / 10
-            elif self.primary_rotation_axis == 'Y':
+            elif axis == 'Y':
                 con.use_limit_y = True
                 con.min_y = pi / 10
                 con.max_y = pi / 10
-            elif self.primary_rotation_axis == '-Y':
+            elif axis == '-Y':
                 con.use_limit_y = True
                 con.min_y = -pi / 10
                 con.max_y = -pi / 10
-            elif self.primary_rotation_axis == 'Z':
+            elif axis == 'Z':
                 con.use_limit_z = True
                 con.min_z = pi / 10
                 con.max_z = pi / 10
-            elif self.primary_rotation_axis == '-Z':
+            elif axis == '-Z':
                 con.use_limit_z = True
                 con.min_z = -pi / 10
                 con.max_z = -pi / 10
+        if self.bend_hint:
+            add_bend_hint(flimb_p, self.primary_rotation_axis)
+            add_bend_hint(flimb_nostr_p, self.primary_rotation_axis)
 
-        # IK Constraint
-        con = flimb_p.constraints.new('IK')
+        # Constrain normal IK chain to no-stretch IK chain
+        con = ulimb_p.constraints.new('COPY_TRANSFORMS')
+        con.name = "pre_stretch"
+        con.target = self.obj
+        con.subtarget = ulimb_nostr
+
+        con = flimb_p.constraints.new('COPY_TRANSFORMS')
+        con.name = "pre_stretch"
+        con.target = self.obj
+        con.subtarget = flimb_nostr
+
+        # IK Constraints
+        con = flimb_nostr_p.constraints.new('IK')
         con.name = "ik"
         con.target = self.obj
         con.subtarget = elimb_mch
@@ -540,7 +584,23 @@ class IKLimb:
         con.pole_subtarget = pole
         con.pole_angle = pole_offset
         con.chain_count = 2
-        
+
+        con = flimb_p.constraints.new('IK')
+        con.name = "ik"
+        con.target = self.obj
+        con.subtarget = elimb_mch
+        con.chain_count = 2
+
+        # Driver to enable/disable auto stretching IK chain
+        fcurve = con.driver_add("influence")
+        driver = fcurve.driver
+        var = driver.variables.new()
+        driver.type = 'AVERAGE'
+        var.name = "var"
+        var.targets[0].id_type = 'OBJECT'
+        var.targets[0].id = self.obj
+        var.targets[0].data_path = elimb_p.path_from_id() + '["auto_stretch"]'
+
         # Stretch bone constraints
         con = ulimb_str_p.constraints.new('COPY_TRANSFORMS')
         con.name = "anchor"
@@ -548,14 +608,16 @@ class IKLimb:
         con.subtarget = ulimb
         con = ulimb_str_p.constraints.new('MAINTAIN_VOLUME')
         con.name = "stretch"
-        
+        con.owner_space = 'LOCAL'
+
         con = flimb_str_p.constraints.new('COPY_TRANSFORMS')
         con.name = "anchor"
         con.target = self.obj
         con.subtarget = flimb
         con = flimb_str_p.constraints.new('MAINTAIN_VOLUME')
         con.name = "stretch"
-        
+        con.owner_space = 'LOCAL'
+
         # Constrain org bones
         con = pb[self.org_bones[0]].constraints.new('COPY_TRANSFORMS')
         con.name = "ik"
@@ -635,11 +697,11 @@ class IKLimb:
             viselimb_p.bone.layers = self.layers
             vispole_p.bone.layers = self.layers
 
-        # Create widgets        
+        # Create widgets
         create_line_widget(self.obj, vispole)
         create_line_widget(self.obj, viselimb)
         create_sphere_widget(self.obj, pole)
-        
+
         ob = create_widget(self.obj, elimb)
         if ob != None:
             verts = [(0.7, 1.5, 0.0), (0.7, -0.25, 0.0), (-0.7, -0.25, 0.0), (-0.7, 1.5, 0.0), (0.7, 0.723, 0.0), (-0.7, 0.723, 0.0), (0.7, 0.0, 0.0), (-0.7, 0.0, 0.0)]
@@ -685,7 +747,7 @@ class RubberHoseLimb:
 
         if not self.use_complex_limb:
             # Simple rig
-            
+
             # Create bones
             ulimb = copy_bone(self.obj, self.org_bones[0], make_deformer_name(strip_org(self.org_bones[0])))
             flimb = copy_bone(self.obj, self.org_bones[1], make_deformer_name(strip_org(self.org_bones[1])))
@@ -701,14 +763,14 @@ class RubberHoseLimb:
             # Parenting
             elimb_e.parent = flimb_e
             elimb_e.use_connect = True
-            
+
             flimb_e.parent = ulimb_e
             flimb_e.use_connect = True
-                
+
             if parent != None:
                 elimb_e.use_connect = False
                 ulimb_e.parent = eb[parent]
-            
+
             # Object mode, get pose bones
             bpy.ops.object.mode_set(mode='OBJECT')
             pb = self.obj.pose.bones
@@ -732,11 +794,18 @@ class RubberHoseLimb:
             con.name = "def"
             con.target = self.obj
             con.subtarget = self.org_bones[2]
-            
+
             return []
         else:
             # Complex rig
-            
+
+            # Get the .R or .L off the end of the upper limb name if it exists
+            lr = self.org_bones[0].split(".", 1)
+            if len(lr) == 1:
+                lr = ""
+            else:
+                lr = lr[1]
+
             # Create bones
             ulimb1 = copy_bone(self.obj, self.org_bones[0], make_deformer_name(strip_org(insert_before_lr(self.org_bones[0], ".01"))))
             ulimb2 = copy_bone(self.obj, self.org_bones[0], make_deformer_name(strip_org(insert_before_lr(self.org_bones[0], ".02"))))
@@ -745,73 +814,97 @@ class RubberHoseLimb:
             elimb = copy_bone(self.obj, self.org_bones[2], make_deformer_name(strip_org(self.org_bones[2])))
 
             junc = copy_bone(self.obj, self.org_bones[1], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[1], ".junc"))))
-            
+
             uhose = new_bone(self.obj, strip_org(insert_before_lr(self.org_bones[0], "_hose")))
-            lr = self.org_bones[0].split(".", 1)  # Get the .R or .L off the end of the name if it exists
-            if len(lr) == 1:
-                lr = ""
-            else:
-                lr = lr[1]
             jhose = new_bone(self.obj, self.junc_base_name + "_hose." + lr)
             fhose = new_bone(self.obj, strip_org(insert_before_lr(self.org_bones[1], "_hose")))
-        
+
+            uhose_par = copy_bone(self.obj, self.org_bones[0], make_mechanism_name(strip_org(insert_before_lr(uhose, "_parent"))))
+            jhose_par = copy_bone(self.obj, junc, make_mechanism_name(strip_org(insert_before_lr(jhose, "_parent"))))
+            fhose_par = copy_bone(self.obj, self.org_bones[1], make_mechanism_name(strip_org(insert_before_lr(fhose, "_parent"))))
+
             # Get edit bones
             eb = self.obj.data.edit_bones
+
+            if parent != None:
+                parent_e = eb[parent]
+            else:
+                parent_e = None
 
             ulimb1_e = eb[ulimb1]
             ulimb2_e = eb[ulimb2]
             flimb1_e = eb[flimb1]
             flimb2_e = eb[flimb2]
             elimb_e = eb[elimb]
-            
+
             junc_e = eb[junc]
-            
+
             uhose_e = eb[uhose]
             jhose_e = eb[jhose]
             fhose_e = eb[fhose]
-        
+
+            uhose_par_e = eb[uhose_par]
+            jhose_par_e = eb[jhose_par]
+            fhose_par_e = eb[fhose_par]
+
             # Parenting
             if parent != None:
                 ulimb1_e.use_connect = False
-                ulimb1_e.parent = eb[parent]
-            
+                ulimb1_e.parent = parent_e
+
             ulimb2_e.use_connect = False
             ulimb2_e.parent = eb[self.org_bones[0]]
-            
+
             flimb1_e.use_connect = True
             flimb1_e.parent = ulimb2_e
-            
+
             flimb2_e.use_connect = False
             flimb2_e.parent = eb[self.org_bones[1]]
-            
+
             elimb_e.use_connect = False
             elimb_e.parent = eb[self.org_bones[2]]
-            
+
             junc_e.use_connect = False
             junc_e.parent = eb[self.org_bones[0]]
-            
+
             uhose_e.use_connect = False
-            uhose_e.parent = eb[self.org_bones[0]]
-            
+            uhose_e.parent = uhose_par_e
+
             jhose_e.use_connect = False
-            jhose_e.parent = junc_e
-            
+            jhose_e.parent = jhose_par_e
+
             fhose_e.use_connect = False
-            fhose_e.parent = eb[self.org_bones[1]]
-            
+            fhose_e.parent = fhose_par_e
+
+            uhose_par_e.use_connect = False
+            uhose_par_e.parent = parent_e
+
+            jhose_par_e.use_connect = False
+            jhose_par_e.parent = parent_e
+
+            fhose_par_e.use_connect = False
+            fhose_par_e.parent = parent_e
+
             # Positioning
             ulimb1_e.length *= 0.5
             ulimb2_e.head = Vector(ulimb1_e.tail)
             flimb1_e.length *= 0.5
             flimb2_e.head = Vector(flimb1_e.tail)
             align_bone_roll(self.obj, flimb2, elimb)
-            
+
             junc_e.length *= 0.2
-            
+
+            uhose_par_e.length *= 0.25
+            jhose_par_e.length *= 0.15
+            fhose_par_e.length *= 0.25
+            put_bone(self.obj, uhose_par, Vector(ulimb1_e.tail))
+            put_bone(self.obj, jhose_par, Vector(ulimb2_e.tail))
+            put_bone(self.obj, fhose_par, Vector(flimb1_e.tail))
+
             put_bone(self.obj, uhose, Vector(ulimb1_e.tail))
             put_bone(self.obj, jhose, Vector(ulimb2_e.tail))
             put_bone(self.obj, fhose, Vector(flimb1_e.tail))
-            
+
             if 'X' in self.primary_rotation_axis:
                 upoint = Vector(ulimb1_e.z_axis)
                 fpoint = Vector(flimb1_e.z_axis)
@@ -821,69 +914,73 @@ class RubberHoseLimb:
             else:  # Y
                 upoint = Vector(ulimb1_e.z_axis)
                 fpoint = Vector(flimb1_e.z_axis)
-            
+
             if '-' not in self.primary_rotation_axis:
                 upoint *= -1
                 fpoint *= -1
-            
+
             if 'Y' in self.primary_rotation_axis:
                 uside = Vector(ulimb1_e.x_axis)
                 fside = Vector(flimb1_e.x_axis)
             else:
                 uside = Vector(ulimb1_e.y_axis) * -1
                 fside = Vector(flimb1_e.y_axis) * -1
-            
+
             uhose_e.tail = uhose_e.head + upoint
             jhose_e.tail = fhose_e.head + upoint + fpoint
             fhose_e.tail = fhose_e.head + fpoint
-            
+
             align_bone_z_axis(self.obj, uhose, uside)
-            align_bone_z_axis(self.obj, jhose, uside+fside)
+            align_bone_z_axis(self.obj, jhose, uside + fside)
             align_bone_z_axis(self.obj, fhose, fside)
-            
+
             l = 0.125 * (ulimb1_e.length + ulimb2_e.length + flimb1_e.length + flimb2_e.length)
             uhose_e.length = l
             jhose_e.length = l
             fhose_e.length = l
-            
+
             # Object mode, get pose bones
             bpy.ops.object.mode_set(mode='OBJECT')
             pb = self.obj.pose.bones
-            
+
             ulimb1_p = pb[ulimb1]
             ulimb2_p = pb[ulimb2]
             flimb1_p = pb[flimb1]
             flimb2_p = pb[flimb2]
             elimb_p = pb[elimb]
-            
+
             junc_p = pb[junc]
-            
+
             uhose_p = pb[uhose]
             jhose_p = pb[jhose]
             fhose_p = pb[fhose]
-            
+
+            uhose_par_p = pb[uhose_par]
+            jhose_par_p = pb[jhose_par]
+            fhose_par_p = pb[fhose_par]
+
             # Lock axes
             uhose_p.lock_rotation = (True, True, True)
             uhose_p.lock_rotation_w = True
             uhose_p.lock_scale = (True, True, True)
-            
+
             jhose_p.lock_rotation = (True, True, True)
             jhose_p.lock_rotation_w = True
             jhose_p.lock_scale = (True, True, True)
-            
+
             fhose_p.lock_rotation = (True, True, True)
             fhose_p.lock_rotation_w = True
             fhose_p.lock_scale = (True, True, True)
-            
+
             # B-bone settings
             ulimb2_p.bone.bbone_segments = 16
             ulimb2_p.bone.bbone_in = 0.0
             ulimb2_p.bone.bbone_out = 1.0
-            
+
             flimb1_p.bone.bbone_segments = 16
             flimb1_p.bone.bbone_in = 1.0
             flimb1_p.bone.bbone_out = 0.0
-            
+
             # Custom properties
             prop = rna_idprop_ui_prop_get(jhose_p, "smooth_bend", create=True)
             jhose_p["smooth_bend"] = 0.0
@@ -899,7 +996,7 @@ class RubberHoseLimb:
             var.targets[0].id_type = 'OBJECT'
             var.targets[0].id = self.obj
             var.targets[0].data_path = jhose_p.path_from_id() + '["smooth_bend"]'
-            
+
             fcurve = flimb1_p.bone.driver_add("bbone_in")
             driver = fcurve.driver
             var = driver.variables.new()
@@ -908,7 +1005,7 @@ class RubberHoseLimb:
             var.targets[0].id_type = 'OBJECT'
             var.targets[0].id = self.obj
             var.targets[0].data_path = jhose_p.path_from_id() + '["smooth_bend"]'
-            
+
             # Constraints
             con = ulimb1_p.constraints.new('COPY_SCALE')
             con.name = "anchor"
@@ -923,7 +1020,7 @@ class RubberHoseLimb:
             con.target = self.obj
             con.subtarget = uhose
             con.volume = 'NO_VOLUME'
-            
+
             con = ulimb2_p.constraints.new('COPY_LOCATION')
             con.name = "anchor"
             con.target = self.obj
@@ -937,7 +1034,7 @@ class RubberHoseLimb:
             con.target = self.obj
             con.subtarget = jhose
             con.volume = 'NO_VOLUME'
-            
+
             con = flimb1_p.constraints.new('COPY_TRANSFORMS')
             con.name = "anchor"
             con.target = self.obj
@@ -955,7 +1052,7 @@ class RubberHoseLimb:
             con.target = self.obj
             con.subtarget = fhose
             con.volume = 'NO_VOLUME'
-            
+
             con = flimb2_p.constraints.new('COPY_LOCATION')
             con.name = "anchor"
             con.target = self.obj
@@ -973,13 +1070,56 @@ class RubberHoseLimb:
             con.target = self.obj
             con.subtarget = self.org_bones[2]
             con.volume = 'NO_VOLUME'
-            
+
             con = junc_p.constraints.new('COPY_TRANSFORMS')
             con.name = "bend"
             con.target = self.obj
             con.subtarget = self.org_bones[1]
             con.influence = 0.5
-            
+
+            con = uhose_par_p.constraints.new('COPY_ROTATION')
+            con.name = "follow"
+            con.target = self.obj
+            con.subtarget = self.org_bones[0]
+            con.influence = 1.0
+            con = uhose_par_p.constraints.new('COPY_LOCATION')
+            con.name = "anchor"
+            con.target = self.obj
+            con.subtarget = self.org_bones[0]
+            con.influence = 1.0
+            con = uhose_par_p.constraints.new('COPY_LOCATION')
+            con.name = "anchor"
+            con.target = self.obj
+            con.subtarget = jhose
+            con.influence = 0.5
+
+            con = jhose_par_p.constraints.new('COPY_ROTATION')
+            con.name = "follow"
+            con.target = self.obj
+            con.subtarget = junc
+            con.influence = 1.0
+            con = jhose_par_p.constraints.new('COPY_LOCATION')
+            con.name = "anchor"
+            con.target = self.obj
+            con.subtarget = junc
+            con.influence = 1.0
+
+            con = fhose_par_p.constraints.new('COPY_ROTATION')
+            con.name = "follow"
+            con.target = self.obj
+            con.subtarget = self.org_bones[1]
+            con.influence = 1.0
+            con = fhose_par_p.constraints.new('COPY_LOCATION')
+            con.name = "anchor"
+            con.target = self.obj
+            con.subtarget = jhose
+            con.influence = 1.0
+            con = fhose_par_p.constraints.new('COPY_LOCATION')
+            con.name = "anchor"
+            con.target = self.obj
+            con.subtarget = self.org_bones[2]
+            con.influence = 0.5
+
             # Layers
             if self.layers:
                 uhose_p.bone.layers = self.layers
@@ -990,13 +1130,10 @@ class RubberHoseLimb:
                 uhose_p.bone.layers = layers
                 jhose_p.bone.layers = layers
                 fhose_p.bone.layers = layers
-            
+
             # Create widgets
             create_sphere_widget(self.obj, uhose)
             create_sphere_widget(self.obj, jhose)
             create_sphere_widget(self.obj, fhose)
-            
+
             return [uhose, jhose, fhose]
-            
-            
-            

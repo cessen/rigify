@@ -56,9 +56,10 @@ if is_selected(fk_leg):
         layout.prop(pose_bones[fk_leg[0]], '["isolate"]', text="Isolate Rotation (" + fk_leg[0] + ")", slider=True)
     except KeyError:
         pass
-    layout.prop(pose_bones[fk_leg[0]], '["stretch"]', text="Stretch FK (" + fk_leg[0] + ")", slider=True)
+    layout.prop(pose_bones[fk_leg[0]], '["stretch_length"]', text="Length FK (" + fk_leg[0] + ")", slider=True)
 if is_selected(ik_leg):
-    layout.prop(pose_bones[ik_leg[2]], '["stretch"]', text="Stretch IK (" + ik_leg[2] + ")", slider=True)
+    layout.prop(pose_bones[ik_leg[2]], '["stretch_length"]', text="Length IK (" + ik_leg[2] + ")", slider=True)
+    layout.prop(pose_bones[ik_leg[2]], '["auto_stretch"]', text="Auto-Stretch IK (" + ik_leg[2] + ")", slider=True)
 """
 
 hose_script = """
@@ -86,7 +87,7 @@ class Rig:
         """
         self.obj = obj
         self.params = params
-        
+
         # Gather deform rig
         self.deform_rig = deform.Rig(obj, bone, params)
 
@@ -119,7 +120,7 @@ def add_parameters(params):
     """
     params.use_complex_leg = bpy.props.BoolProperty(name="Complex Leg Rig", default=True, description="Generate the full, complex leg rig with twist bones and rubber-hose controls")
     params.bend_hint = bpy.props.BoolProperty(name="Bend Hint", default=True, description="Give IK chain a hint about which way to bend (useful for perfectly straight chains)")
-    
+
     items = [('X', 'X', ''), ('Y', 'Y', ''), ('Z', 'Z', ''), ('-X', '-X', ''), ('-Y', '-Y', ''), ('-Z', '-Z', '')]
     params.primary_rotation_axis = bpy.props.EnumProperty(items=items, name="Primary Rotation Axis", default='X')
 
@@ -130,7 +131,7 @@ def add_parameters(params):
 
     params.separate_hose_layers = bpy.props.BoolProperty(name="Separate Rubber-hose Control Layers:", default=False, description="Enable putting the rubber-hose controls on a separate layer from the other controls")
     params.hose_layers = bpy.props.BoolVectorProperty(size=32, description="Layers for the rubber-hose controls to be on")
-    
+
 
 def parameters_ui(layout, params):
     """ Create the ui for the rig parameters.
@@ -142,13 +143,13 @@ def parameters_ui(layout, params):
     r = layout.row()
     r.label(text="Knee rotation axis:")
     r.prop(params, "primary_rotation_axis", text="")
-    
+
     r = layout.row()
     r.prop(params, "knee_base_name")
-        
+
     r = layout.row()
     r.prop(params, "bend_hint")
-    
+
     r = layout.row()
     r.prop(params, "separate_ik_layers")
 
@@ -198,7 +199,7 @@ def parameters_ui(layout, params):
     if params.use_complex_leg:
         r = layout.row()
         r.prop(params, "separate_hose_layers")
-        
+
         r = layout.row()
         r.active = params.separate_hose_layers
 
@@ -241,7 +242,6 @@ def parameters_ui(layout, params):
         row.prop(params, "hose_layers", index=29, toggle=True, text="")
         row.prop(params, "hose_layers", index=30, toggle=True, text="")
         row.prop(params, "hose_layers", index=31, toggle=True, text="")
-    
 
 
 def create_sample(obj):

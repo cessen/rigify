@@ -265,7 +265,6 @@ def generate_rig(context, metarig):
     try:
         # Collect/initialize all the rigs.
         rigs = []
-        deformation_rigs = []
         for bone in bones_sorted:
             bpy.ops.object.mode_set(mode='EDIT')
             rigs += get_bone_rigs(obj, bone)
