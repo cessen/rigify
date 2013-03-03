@@ -33,3 +33,6 @@ nosetests.xml
 .mr.developer.cfg
 .project
 .pydevproject
+
+# Ignore files
+rigs/pitchipoy/super_torso.py~
