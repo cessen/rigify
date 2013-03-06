@@ -25,7 +25,7 @@ class Rig:
         if len(self.org_bones) <= 4:
             raise MetarigError("RIGIFY ERROR: Bone '%s': listen bro, that torso rig jusaint put tugetha rite. A little hint, use at least five bones!!" % (strip_org(bone_name)))            
 
-    def make_torso( self ):
+    def create_torso( self ):
         """ Create the torso control bone """
 
         org_bones = self.org_bones
@@ -49,7 +49,7 @@ class Rig:
         
         return { 'ctrl' : ctrl_bone }
         
-    def make_hips( self, torso_name ):
+    def create_hips( self, torso_name ):
         """ Create the hip bones """
 
         org_bones = self.org_bones
@@ -88,9 +88,16 @@ class Rig:
         # Create mechanism driver bone
         mch_drv   = copy_bone(self.obj, tweak_bone, make_mechanism_name(ctrl_name) + "_DRV" )
         
-        return { 'ctrl' : ctrl_bone, 'mch' : mch_bone, 'tweak' : tweak_bone, 'mch_drv' : mch_drv }
+        hips_dict = {
+            'ctrl'    : ctrl_bone, 
+            'mch'     : mch_bone, 
+            'tweak'   : tweak_bone, 
+            'mch_drv' : mch_drv 
+        }
         
-    def make_spine( self, hips ):
+        return hips_dict
+        
+    def create_back( self, hips ):
         org_bones = self.org_bones
 
         bpy.ops.object.mode_set(mode ='EDIT')
@@ -121,8 +128,12 @@ class Rig:
         ribs_ctrl_bone.tail[:] = eb[ribs_org_bones[-1]].tail
         ribs_ctrl_bone.roll    = eb[ribs_org_bones[0]].roll
         
+        # Create mechanism rotation bone
+        ribs_mch_rotation_name = make_mechanism_name( strip_org( ribs_org_bones[0] ) ) + '_rotation'
+        ribs_mch_rotation_name = copy_bone(self.obj, ribs_ctrl_name, ribs_mch_rotation_name )
+        
         # Create mechanism stretch bone
-        spine_mch_stretch_name = make_mechanism_name( strip_org( spine_org_bones[0] ) ) + 'stretch'
+        spine_mch_stretch_name = make_mechanism_name( strip_org( spine_org_bones[0] ) ) + '_stretch'
         
         spine_mch_stretch_bone = eb.new( spine_mch_stretch_name )
         spine_mch_stretch_bone.head[:] = eb[spine_org_bones[0]].head
@@ -132,64 +143,176 @@ class Rig:
         # Create mch_drv bone
         no_of_bones = len(back_org_bones)    
         distance_vector = ( eb[spine_mch_stretch_name].tail - eb[spine_mch_stretch_name].head ) / no_of_bones
-
-        for i in range(no_of_bones):
-            bone = eb.new(str(i))
-            bone.head[:]    = eb[spine_mch_stretch_name].head + distance_vector * i
-            bone.tail[:]    = bone.head + distance_vector / 4 
-            bone.roll       = spine_mch_stretch_bone.roll
         
-        # Create mechanism rotation bone
-        ribs_mch_rotation_name = make_mechanism_name( strip_org( ribs_org_bones[0] ) ) + 'rotation'
-        ribs_mch_rotation_name = copy_bone(self.obj, ribs_ctrl_bone, ribs_mch_rotation_name )
-
+        mch_drv_bones = []        
+        for i in range(no_of_bones):
+            bone_name = make_mechanism_name( strip_org( back_org_bones[i] ) + '_DRV'
+            bone = eb.new( bone_name )
+            bone.head[:] = eb[spine_mch_stretch_name].head + distance_vector * i
+            bone.tail[:] = bone.head + distance_vector / 4 
+            bone.roll    = spine_mch_stretch_bone.roll
+            mch_drv_bones.append( bone_name )
+        
+        tweak_bones = []
+        mch_bones   = []
         for org in back_org_bones:
             
             # Create tweak bone
             tweak_name = strip_org(org)
             tweak_bone = copy_bone(self.obj, org, tweak_name )
+            tweak_bone.tail = (tweak_bone.tail - tweak_bone.head) / 2
+
+            tweak_bones.append( tweak_name )
             
             # Create mch bone
             mch_name = make_mechanism_name( strip_org(org) )
             mch_bone = copy_bone(self.obj, org, mch_name )
-            
 
-            
+            mch_bones.append( mch_name )
 
-
-            
-            
+        back_dict = {
+            'spine_ctrl'    : spine_ctrl_name,
+            'ribs_ctrl'     : ribs_ctrl_name,
+            'mch_stretch'   : spine_mch_stretch_name,
+            'mch_rotation'  : ribs_mch_rotation_name,
+            'mch_drv_bones' : mch_drv_bones,
+            'tweak_bones'   : tweak_bones,
+            'mch_bones'     : mch_bones
+        }
         
-        
-        
+        return back_dict
        
-    def make_neck( self, spine ):
+    def create_neck( self, back ):
         org_bones = self.org_bones
 
         bpy.ops.object.mode_set(mode ='EDIT')
         eb = self.obj.data.edit_bones
         
-    def make_head( self, neck ):
+        neck_org_bones = sorted([ bone for bone in org_bones if 'neck' in bone.lower() ], key=str.lower )
+        
+        # Create ctrl bone
+        neck_ctrl_name = strip_org( neck_org_bones[0] )
+        
+        neck_ctrl_bone = eb.new( neck_ctrl_name )
+        neck_ctrl_bone.head[:] = eb[neck_org_bones[0]].head
+        neck_ctrl_bone.tail[:] = eb[neck_org_bones[-1]].tail
+        neck_ctrl_bone.roll    = eb[neck_org_bones[0]].roll
+        
+        # Create mch rotation bone
+        neck_mch_rotation_name = make_mechanism_name( neck_ctrl_name ) + '_rotation'
+        neck_mch_rotation_name = copy_bone(self.obj, neck_ctrl_name, neck_mch_rotation_name )
+        
+        # Create mch stretch bone
+        neck_mch_stretch_name = make_mechanism_name( neck_ctrl_name ) + '_stretch'
+        neck_mch_stretch_name = copy_bone(self.obj, neck_ctrl_name, neck_mch_stretch_name )
+        
+        mch_drv_bones = []
+        tweak_bones   = []
+        mch_bones     = []
+        for org in neck_org_bones:
+            # Create mch drv bones
+            neck_mch_drv_name = make_mechanism_name( neck_ctrl_name ) + '_DRV'
+            neck_mch_drv_name = copy_bone( self.obj, org, neck_mch_drv_name )
+            neck_mch_drv_bone = eb[neck_mch_drv_name]
+            neck_mch_drv_bone.tail = ( neck_mch_drv_bone.tail - neck_mch_drv_bone.head) / 4
+
+            mch_drv_bones.append(neck_mch_drv_name)
+            
+            # Create tweak bones
+            neck_tweak_name = copy_bone( self.obj, org, neck_ctrl_name )
+            neck_tweak_bone = eb[neck_tweak_name]
+            neck_tweak_bone.tail = ( neck_tweak_bone.tail - neck_tweak_bone.head) / 2
+
+            tweak_bones.append( neck_tweak_name )
+            # Create mch bones
+            neck_mch_name = make_mechanism_name( neck_ctrl_name )
+            neck_mch_name = copy_bone( self.obj, org, neck_mch_name )
+            
+            mch_bones.append( neck_mch_name )
+        
+        neck_dict = {
+            'ctrl'          : neck_ctrl_name,
+            'mch_stretch'   : neck_mch_stretch_name,
+            'mch_rotation'  : neck_mch_rotation_name,
+            'mch_drv_bones' : mch_drv_bones,
+            'tweak_bones'   : tweak_bones,
+            'mch_bones'     : mch_bones
+        }
+        
+        return neck_dict    
+        
+    def create_head( self, neck ):
         org_bones = self.org_bones
 
         bpy.ops.object.mode_set(mode ='EDIT')
         eb = self.obj.data.edit_bones
         
-    def make_deformation(self)
+        # Create ctrl bone
+        head_ctrl_name = strip_org( org_bones[-1] )
+        head_ctrl_name = copy_bone( self.obj, org_bones[-1], head_ctrl_name )
         
+        # Create mch rotation bone
+        head_mch_rotation_name = make_mechanism_name( head_ctrl_name ) + '_rotation'
+        head_mch_rotation_name = copy_bone( self.obj, org_bones[-1], head_mch_rotation_name )
+        
+        # Create mch drv bone
+        head_mch_drv_name = make_mechanism_name( head_ctrl_name ) + '_DRV'
+        head_mch_drv_name = copy_bone( self.obj, org_bones[-1], head_mch_drv_name )
+        head_mch_drv_bone = eb[head_mch_drv_name]
+        head_mch_drv_bone.tail = ( head_mch_drv_bone.tail - head_mch_drv_bone.head) / 4
+
+        head_dict = {
+            'ctrl'         : head_ctrl_name, 
+            'mch_rotation' : head_mch_rotation_name, 
+            'mch_drv'      : head_mch_drv_name 
+        }
+        
+        return head_dict
+        
+    def create_deformation(self):
+        org_bones = self.org_bones
+
+        bpy.ops.object.mode_set(mode ='EDIT')
+        eb = self.obj.data.edit_bones
+        
+        def_bones = []
+        for org in org_bones:
+            def_name = make_deformer_name( strip_org( org ) )
+            def_name = copy_bone( self.obj, org, def_name )
+            def_bones.append( def_name )
+
+        return { 'def_bones' : def_bones }
     
-    def make_fk(self, torso_name)
+    def create_fk(self, torso_name):
+        org_bones = self.org_bones
+
+        bpy.ops.object.mode_set(mode ='EDIT')
+        eb = self.obj.data.edit_bones
+        
+        fk_bones = []
+        for org in org_bones:
+            fk_name = strip_org( org ) + 'FK'
+            fk_name = copy_bone( self.obj, org, fk_name )
+
+            fk_bones.append( fk_name )
+            if org_bones.index[org] == 0:
+                # Flip the hips' direction to create a more natural pivot for rotation
+                bpy.ops.armature.select_all(action='DESELECT')
+                eb[fk_name].select = True
+                bpy.ops.armature.switch_direction()
+
+        return { 'fk_bones' = fk_bones }
+                  
     
     def create_bones(self):
 
-        torso       = self.make_torso( )
-        hips        = self.make_hips( torso )
-        spine       = self.make_spine( hips )
-        ribs        = self.make_ribs( spine )
-        neck        = self.make_neck( ribs )
-        head        = self.make_head( neck )
-        deformation = self.make_deformation( )
-        fk          = self.make_fk( torso_name )
+        torso       = self.create_torso( )
+        hips        = self.create_hips( torso )
+        back        = self.create_back( hips )
+        neck        = self.create_neck( back )
+        head        = self.create_head( neck )
+        deformation = self.create_deformation( )
+        fk          = self.create_fk( torso_name )
 
     def parent_bones(self):
 
