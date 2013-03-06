@@ -87,20 +87,27 @@ class Rig:
         bpy.ops.object.mode_set(mode ='EDIT')
         eb = self.obj.data.edit_bones
 
-        
-
-        torso_name   = eb[torso_name]
-        mch_bone_e   = eb[mch_bone]
+        torso_bone_e = eb[torso_name]
+        ctrl_bone_e  = eb[ctrl_name]
         mch_drv_e    = eb[mch_drv]
         tweak_bone_e = eb[tweak_bone]
-        ctrl_bone_e  = eb[ctrl_name]
+        mch_bone_e   = eb[mch_bone]
 
         # Parenting
         # torso --> hips
+        ctrl_bone_e.parent  = torso_bone
         # hips  --> MCH_DRV
+        mch_drv_e.parent    = ctrl_bone_e
         # MCH_DRV --> tweak_bone
-        #        
+        tweak_bone_e.parent = mch_drv_e
+        # MCH --> tweak_bone       
+        mch_bone_e.parent   = tweak_bone_e
         
+        bpy.ops.object.mode_set(mode ='OBJECT')
+        pb = self.obj.data.pose.bones
+        
+        # Constraining
+        # ?? the constrains of the MCH to damped track and stretch and the MCH-DRV to copy transforms with driver
         
 
         
@@ -131,9 +138,8 @@ class Rig:
     def make_deformation(self)
     
     def make_fk(self, torso_name)
-        
-        
-    def generate(self):
+    
+    def create_bones(self):
 
         torso       = self.make_torso( )
         hips        = self.make_hips( torso )
@@ -143,6 +149,22 @@ class Rig:
         head        = self.make_head( neck )
         deformation = self.make_deformation( )
         fk          = self.make_fk( torso_name )
+
+    def parent_bones(self):
+    
+    def constraints_and_drivers(self):
+    
+    def assign_widgets(self):
+
+    def generate(self):
+        
+        self.create_bones()
+        self.parent_bones()
+        self.constraints_and_drivers()
+        self.assign_widgets()
+
+
+
 def add_parameters(params):
     """ Add the parameters of this rig type to the
         RigifyParameters PropertyGroup
