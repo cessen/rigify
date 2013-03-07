@@ -25,6 +25,7 @@ class Rig:
         if len(self.org_bones) <= 4:
             raise MetarigError("RIGIFY ERROR: Bone '%s': listen bro, that torso rig jusaint put tugetha rite. A little hint, use at least five bones!!" % (strip_org(bone_name)))            
 
+
     def create_torso( self ):
         """ Create the torso control bone """
 
@@ -97,6 +98,7 @@ class Rig:
         }
         
         return hips_dict
+       
         
     def create_back( self ):
         org_bones = self.org_bones
@@ -184,6 +186,7 @@ class Rig:
         }
         
         return back_dict
+      
        
     def create_neck( self ):
         org_bones = self.org_bones
@@ -244,6 +247,7 @@ class Rig:
         }
         
         return neck_dict    
+      
         
     def create_head( self ):
         org_bones = self.org_bones
@@ -272,21 +276,8 @@ class Rig:
         }
         
         return head_dict
-        
-    def create_deformation( self ):
-        org_bones = self.org_bones
 
-        bpy.ops.object.mode_set(mode ='EDIT')
-        eb = self.obj.data.edit_bones
-        
-        def_bones = []
-        for org in org_bones:
-            def_name = make_deformer_name( strip_org( org ) )
-            def_name = copy_bone( self.obj, org, def_name )
-            def_bones.append( def_name )
 
-        return { 'def_bones' : def_bones }
-    
     def create_fk( self ):
         org_bones = self.org_bones
 
@@ -306,8 +297,23 @@ class Rig:
                 bpy.ops.armature.switch_direction()
 
         return { 'fk_bones' : fk_bones }
-                  
     
+    
+    def create_deformation( self ):
+        org_bones = self.org_bones
+
+        bpy.ops.object.mode_set(mode ='EDIT')
+        eb = self.obj.data.edit_bones
+        
+        def_bones = []
+        for org in org_bones:
+            def_name = make_deformer_name( strip_org( org ) )
+            def_name = copy_bone( self.obj, org, def_name )
+            def_bones.append( def_name )
+
+        return { 'def_bones' : def_bones }
+    
+
     def create_bones(self):
 
         torso       = self.create_torso()
@@ -315,8 +321,8 @@ class Rig:
         back        = self.create_back()
         neck        = self.create_neck()
         head        = self.create_head()
-        deformation = self.create_deformation()
         fk          = self.create_fk()
+        deformation = self.create_deformation()
 
         all_bones = {
             'torso' : torso,
@@ -324,8 +330,8 @@ class Rig:
             'back'  : back,
             'neck'  : neck,
             'head'  : head,
-            'def'   : deformation,
-            'fk'    : fk
+            'fk'    : fk,
+            'def'   : deformation
         }
 
         return all_bones
@@ -340,8 +346,6 @@ class Rig:
         torso_name = all_bones['torso']['ctrl']
         torso_bone_e = eb[torso_name]
         torso_bone_e.parent = None  # Later rigify will parent to root
-        
-        #...
 
         # Parenting the hips' bones
         
@@ -430,6 +434,32 @@ class Rig:
         head_mch_rot_bone_e.parent = None  # Later rigify will parent to root
         head_ctrl_bone_e.parent    = head_mch_rot_bone_e
         head_mch_drv_bone_e.parent = head_mch_rot_bone_e
+        
+        # Parenting the fk bones
+        fk_names = all_bones['fk']['fk_bones']
+        
+        
+        fk_bones_e = [ eb[bone] for bone in fk_names ]
+        
+        for bone in fk_bones_e:
+            # Hips and spine fk are parented directly to the torso bone 
+            if fk_bones_e.index(bone) == 0 or fk_bones_e.index(bone) == 1:
+                bone.parent = torso_bone_e
+            # While the rest use simple chain parenting
+            else:
+                bone.parent = fk_bones_e[ fk_bones_e.index(bone) - 1 ]
+        
+        # Parenting the deformation bones
+        def_names = all_bones['def']['def_bones']
+        
+        def_bones_e = eb[def_names]
+        
+        for bone in def_bones_e:
+            if def_bones_e.index(bone) == 0:
+                bone.parent = None # Later rigify will parent to root
+            # While the rest use simple chain parenting
+            else:
+                bone.parent = def_bones_e[ def_bones_e.index(bone) -1 ]
         
     
     def constraints_and_drivers(self):
