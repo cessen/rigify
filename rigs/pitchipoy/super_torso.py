@@ -49,7 +49,7 @@ class Rig:
         
         return { 'ctrl' : ctrl_bone }
         
-    def create_hips( self, torso_name ):
+    def create_hips( self ):
         """ Create the hip bones """
 
         org_bones = self.org_bones
@@ -97,7 +97,7 @@ class Rig:
         
         return hips_dict
         
-    def create_back( self, hips ):
+    def create_back( self ):
         org_bones = self.org_bones
 
         bpy.ops.object.mode_set(mode ='EDIT')
@@ -146,7 +146,7 @@ class Rig:
         
         mch_drv_bones = []        
         for i in range(no_of_bones):
-            bone_name = make_mechanism_name( strip_org( back_org_bones[i] ) + '_DRV'
+            bone_name = make_mechanismhttp://vimeo.com/59151756#_name( strip_org( back_org_bones[i] ) + '_DRV'
             bone = eb.new( bone_name )
             bone.head[:] = eb[spine_mch_stretch_name].head + distance_vector * i
             bone.tail[:] = bone.head + distance_vector / 4 
@@ -182,7 +182,7 @@ class Rig:
         
         return back_dict
        
-    def create_neck( self, back ):
+    def create_neck( self ):
         org_bones = self.org_bones
 
         bpy.ops.object.mode_set(mode ='EDIT')
@@ -241,7 +241,7 @@ class Rig:
         
         return neck_dict    
         
-    def create_head( self, neck ):
+    def create_head( self ):
         org_bones = self.org_bones
 
         bpy.ops.object.mode_set(mode ='EDIT')
@@ -269,7 +269,7 @@ class Rig:
         
         return head_dict
         
-    def create_deformation(self):
+    def create_deformation( self ):
         org_bones = self.org_bones
 
         bpy.ops.object.mode_set(mode ='EDIT')
@@ -283,7 +283,7 @@ class Rig:
 
         return { 'def_bones' : def_bones }
     
-    def create_fk(self, torso_name):
+    def create_fk( self ):
         org_bones = self.org_bones
 
         bpy.ops.object.mode_set(mode ='EDIT')
@@ -306,13 +306,13 @@ class Rig:
     
     def create_bones(self):
 
-        torso       = self.create_torso( )
-        hips        = self.create_hips( torso )
-        back        = self.create_back( hips )
-        neck        = self.create_neck( back )
-        head        = self.create_head( neck )
-        deformation = self.create_deformation( )
-        fk          = self.create_fk( torso_name )
+        torso       = self.create_torso()
+        hips        = self.create_hips()
+        back        = self.create_back()
+        neck        = self.create_neck()
+        head        = self.create_head()
+        deformation = self.create_deformation()
+        fk          = self.create_fk()
 
     def parent_bones(self):
 
@@ -333,15 +333,15 @@ class Rig:
         mch_bone_e.parent   = tweak_bone_e
     
     def constraints_and_drivers(self):
-    
+        pass
     def assign_widgets(self):
-
+        pass
     def generate(self):
         
         self.create_bones()
-        self.parent_bones()
-        self.constraints_and_drivers()
-        self.assign_widgets()
+        #self.parent_bones()
+        #self.constraints_and_drivers()
+        #self.assign_widgets()
 
 
 
