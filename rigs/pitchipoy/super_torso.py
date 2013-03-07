@@ -112,7 +112,7 @@ class Rig:
         back_org_bones = spine_org_bones + ribs_org_bones
 
         ## TODO:
-        #  1. add suppor for misnumbered chain names ( bone --> bone.002 --> bone.003 )
+        #  1. add support for misnumbered chain names ( bone --> bone.002 --> bone.003 )
         #     and use the parenting structure instead
         # first_spine_bone = [ bone for bone in spine_org_bones if 'hips' in bone.parent.name.lower() ].pop()        
 
@@ -342,6 +342,11 @@ class Rig:
         bpy.ops.object.mode_set(mode ='EDIT')
         eb = self.obj.data.edit_bones
         
+        # Clearing out previous parenting save the org bones
+        for bone in eb:
+            if bone.name not in org_bones:
+                bone.parent = None
+        
         # Parenting the torso and its children
         torso_name = all_bones['torso']['ctrl']
         torso_bone_e = eb[torso_name]
@@ -384,7 +389,7 @@ class Rig:
         
         spine_ctrl_bone_e.parent   = torso_bone_e
         ribs_mch_rot_bone_e.parent = torso_bone_e
-        ribs_ctrl_bone_e.parent    = back_mch_rot_bone_e
+        ribs_ctrl_bone_e.parent    = ribs_mch_rot_bone_e
         back_mch_str_bone_e.parent = hips_ctrl_bone_e
         
         for drv, tweak, mch in zip( back_mch_drv_bones_e, back_tweak_bones_e, back_mch_bones_e ):
@@ -452,7 +457,7 @@ class Rig:
         # Parenting the deformation bones
         def_names = all_bones['def']['def_bones']
         
-        def_bones_e = eb[def_names]
+        def_bones_e = [ eb[bone] for bone in def_names ]
         
         for bone in def_bones_e:
             if def_bones_e.index(bone) == 0:
@@ -460,19 +465,23 @@ class Rig:
             # While the rest use simple chain parenting
             else:
                 bone.parent = def_bones_e[ def_bones_e.index(bone) -1 ]
-        
-    
+                bone.use_connect = True
+
+
     def constraints_and_drivers(self):
         pass
+
+
     def assign_widgets(self):
         pass
+
+
     def generate(self):
         
         all_bones = self.create_bones()
         self.parent_bones( all_bones )
         #self.constraints_and_drivers()
         #self.assign_widgets()
-
 
 
 def add_parameters(params):
@@ -485,6 +494,7 @@ def add_parameters(params):
         default="torso",
         description="The name of the torso master control bone"
         )
+
 
 def parameters_ui(layout, params):
     """ Create the ui for the rig parameters."""
