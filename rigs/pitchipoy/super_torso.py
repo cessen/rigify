@@ -343,6 +343,55 @@ class Rig:
         
         #...
 
+        # Parenting the hips' bones
+        
+        hips_ctrl_name    = all_bones['hips']['ctrl']
+        hips_mch_drv_name = all_bones['hips']['mch_drv']
+        hips_tweak_name   = all_bones['hips']['tweak']
+        hips_mch_name     = all_bones['hips']['mch']
+        
+        hips_ctrl_bone_e    = eb[hips_ctrl_name]
+        hips_mch_drv_bone_e = eb[hips_mch_drv_name]
+        hips_tweak_bone_e   = eb[hips_tweak_name]
+        hips_mch_bone_e     = eb[hips_mch_name]
+        
+        hips_ctrl_bone_e.parent    = torso_bone_e
+        hips_mch_drv_bone_e.parent = hips_ctrl_bone_e
+        hips_tweak_bone_e.parent   = hips_mch_drv_bone_e
+        hips_mch_bone_e.parent     = hips_tweak_bone_e
+
+        # Parenting the back bones
+        
+        spine_ctrl_name      = all_bones['back']['spine_ctrl']
+        ribs_mch_rot_name    = all_bones['back']['mch_rotation']
+        ribs_ctrl_name       = all_bones['back']['ribs_ctrl']
+        back_mch_str_name    = all_bones['back']['mch_stretch']
+        back_mch_drv_names   = all_bones['back']['mch_drv_bones']
+        back_tweak_names     = all_bones['back']['tweak_bones']
+        back_mch_names       = all_bones['back']['mch_bones']
+        
+        spine_ctrl_bone_e    = eb[spine_ctrl_name]
+        ribs_mch_rot_bone_e  = eb[ribs_mch_rot_name]
+        ribs_ctrl_bone_e     = eb[ribs_ctrl_name]
+        back_mch_str_bone_e  = eb[back_mch_str_name]
+        back_mch_drv_bones_e = [ eb[bone] for bone in back_mch_drv_names ]
+        back_tweak_bones_e   = [ eb[bone] for bone in back_tweak_names ]
+        back_mch_bones_e     = [ eb[bone] for bone in back_mch_names ]
+        
+        spine_ctrl_bone_e.parent   = torso_bone_e
+        ribs_mch_rot_bone_e.parent = torso_bone_e
+        ribs_ctrl_bone_e.parent    = back_mch_rot_bone_e
+        back_mch_str_bone_e.parent = hips_ctrl_bone_e
+        
+        for drv, tweak, mch in zip( back_mch_drv_bones_e, back_tweak_bones_e, back_mch_bones_e ):
+            
+            if back_mch_drv_bones_e.index(drv) == 0:
+                drv.parent = back_mch_str_bone_e
+            else:
+                drv.parent = ribs_ctrl_bone_e
+            
+            tweak.parent = drv
+            mch.parent   = tweak
         
 
         # Parenting the neck bones
@@ -382,21 +431,6 @@ class Rig:
         head_ctrl_bone_e.parent    = head_mch_rot_bone_e
         head_mch_drv_bone_e.parent = head_mch_rot_bone_e
         
-
-        ctrl_bone_e  = eb[ctrl_name]
-        mch_drv_e    = eb[mch_drv]
-        tweak_bone_e = eb[tweak_bone]
-        mch_bone_e   = eb[mch_bone]
-        
-        # Parenting ???
-        # torso --> hips
-        ctrl_bone_e.parent  = torso_bone
-        # hips  --> MCH_DRV
-        mch_drv_e.parent    = ctrl_bone_e
-        # MCH_DRV --> tweak_bone
-        tweak_bone_e.parent = mch_drv_e
-        # MCH --> tweak_bone       
-        mch_bone_e.parent   = tweak_bone_e
     
     def constraints_and_drivers(self):
         pass
