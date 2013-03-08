@@ -371,7 +371,8 @@ class Rig:
 
         # Parenting the back bones
         
-        spitorso_name = all_bones['torso']['ctrl']ne_ctrl_name      = all_bones['back']['spine_ctrl']
+        torso_name = all_bones['torso']['ctrl']
+        spine_ctrl_name      = all_bones['back']['spine_ctrl']
         ribs_mch_rot_name    = all_bones['back']['mch_rotation']
         ribs_ctrl_name       = all_bones['back']['ribs_ctrl']
         back_mch_str_name    = all_bones['back']['mch_stretch']
@@ -479,55 +480,158 @@ class Rig:
         neck_mch_rot_name = all_bones['neck']['mch_rotation']
         head_mch_rot_name = all_bones['head']['mch_rotation']
         
+        mch_rot_bones = [ ribs_mch_rot_name, neck_mch_rot_name, head_mch_rot_name ]
+        
         # MCH Stretch bone names (2)
         back_mch_str_name = all_bones['back']['mch_stretch']
         neck_mch_str_name = all_bones['neck']['mch_stretch']
-
+        
+        mch_str_bones = [ back_mch_str_name, neck_mch_str_name ]
+        
         # MCH DRV bone names (3)
         hips_mch_drv_name  = all_bones['hips']['mch_drv']
         back_mch_drv_names = all_bones['back']['mch_drv_bones']
         neck_mch_drv_names = all_bones['neck']['mch_drv_bones']
         head_mch_drv_name  = all_bones['head']['mch_drv']
         
+        mch_drv_bones = [ hips_mch_drv_name ] + back_mch_drv_names + neck_mch_drv_names + [ head_mch_drv_name ]
+        
         # MCH bone names (4)
         hips_mch_name  = all_bones['hips']['mch']
         back_mch_names = all_bones['back']['mch_bones']
         neck_mch_names = all_bones['neck']['mch_bones']
+        
+        mch_bones = [ hips_mch_name ] + back_mch_names + neck_mch_names
 
         # Deformation bone names (5)
-        def_names = all_bones['def']['def_bones']
+        def_bones = all_bones['def']['def_bones']
         
-        # Build contraint data dictionary
-        
-
-
-
-        mch_targets = {}
-        mch_owners_and_targets = {}
-        for mch in mch_names:
-            mch_owners_and_targets[mch] = { }
-            for tweak in tweak_names:
-                mch_targets[tweak] = [ 'DAMPED_TRACK', 'STRETCH_TO' ]
-            mch_targets[head_mch_drv_name] = [ 'DAMPED_TRACK', 'STRETCH_TO' ]
-
-
-
-        # MCH Rotation target bone names
-        spine_ctrl_name = all_bones['back']['spine_ctrl']
+        # referencing all subtarget bones
         torso_name      = all_bones['torso']['ctrl']
-        neck_ctrl_name  = all_bones['neck']['ctrl']
+        spine_ctrl_name = all_bones['back']['spine_ctrl']
         ribs_ctrl_name  = all_bones['back']['ribs_ctrl']
+        neck_ctrl_name  = all_bones['neck']['ctrl']
+        head_ctrl_name  = all_bones['head']['ctrl']
+        
+        hips_tweak_name  = all_bones['hips']['tweak']
+        back_tweak_names = all_bones['back']['tweak_bones']
+        neck_tweak_names = all_bones['neck']['tweak_bones']
+        
+        fk_bones = all_bones['fk']['fk_bones']
+        
+        
+        ### Build contraint data dictionary
+        
+        ## MCH Rotation constraints (1)
+        subtarget_bones = [ spine_ctrl_name, ribs_ctrl_name, neck_ctrl_name ] 
+        
+        # Copy_Loc and Copy_Rot for all bones:
+        for bone, subtarget in zip( mch_rot_bones, subtarget_bones ):
+            constraint_data[bone] = [ { 'constraint': 'COPY_LOCATION',
+                                        'subtarget' : subtarget,
+                                        'head_tail' : 1.0              },
+                                      { 'constraint': 'COPY_ROTATION', 
+                                        'subtarget' : subtarget        }                    
+                                    ]
+            # Copy_scale for the last two bones:
+            if mch_rot_bones.index(bone) != 0:
+                 constraint_data[bone].append( { 'constraint': 'COPY_SCALE',
+                                                 'subtarget' : torso_name    } )
+        
+        ## MCH Stretch constraints (2)
+        subtarget_bones = [ ribs_ctrl_name, head_ctrl_name ]
+        
+        for bone, subtarget in zip( mch_str_bones, subtarget_bones ):
+            constraint_data[bone] = [ { 'constraint' : 'DAMPED_TRACK',
+                                       'subtarget'  : subtarget       },
+                                     { 'constraint' : 'STRETCH_TO',
+                                       'subtarget'  : subtarget       } 
+                                   ]
+                                   
+            if mch_str_bones.index(bone) == 0:
+                constraint_data[bone][0]['head_tail'] = 1.0
+                constraint_data[bone][1]['head_tail'] = 1.0
+        
+        ## MCH DRV constraints (3)
 
-        mch_rot_owners_and_targets = {
-            # Owner           : target/s          : [ List of constraints on target    ]
-            ribs_mch_rot_name : { spine_ctrl_name : [ 'COPY_LOCATION', 'COPY_ROTATION' ] }
-            head_mch_rot_name : { ribs_ctrl_name  : [ 'COPY_LOCATION', 'COPY_ROTATION' ],
-                                  torso_name      : [ 'COPY_SCALE'                     ] } 
-            neck_mch_rot_name : { neck_ctrl_name  : [ 'COPY_LOCATION', 'COPY_ROTATION' ],
-                                  torso_name      : [ 'COPY_SCALE'                     ] }
-        }
+        # Initializing constraints data stack
+        for bone in mch_drv_bones:
+            constraint_data[bone] = [ ]
 
+        # back curve (linear falloff)
+        subtarget = back_mch_str_name
+        factor = 1 / len(back_mch_drv_names)
+        
+        for bone in back_mch_drv_names:
+            if back_mch_drv_names.index(bone) != 0:
+                head_tail = back_mch_drv_names.index(bone) * factor
+                influence = 1 - head_tail
+                constraint_data[bone].append( { 'constraint' : 'COPY_TRANSFORMS',
+                                                'subtarget'  : subtarget,
+                                                'head_tail'  : head_tail,
+                                                'influence'  : influence          } )
+                                                
+        # extending the last back mch drv transforms
+        subtarget = ribs_ctrl_name
+        constraint_data[back_mch_drv_names[-1]].extend( [ { 'constraint' : 'COPY_ROTATION',
+                                                            'subtarget'  : subtarget        },
+                                                          { 'constraint' : 'COPY_SCALE',
+                                                            'subtarget'  : subtarget        } ] )
 
+        # neck following head rotation (linear falloff)
+        subtarget = head_ctrl_name
+        factor = 1 / len(neck_mch_drv_names)
+        
+        for bone in neck_mch_drv_names:
+            if neck_mch_drv_names.index(bone) != 0:
+                
+                head_tail = neck_mch_drv_names.index(bone) * factor
+                constraint_data[bone].append( { 'constraint' : 'COPY_ROTATION',
+                                                'subtarget'  : subtarget,
+                                                'influence'  : influence         } )
+        
+        # each back mch_drv following the next in line
+        inner_mch_drv = mch_drv_bones[1:-2]
+        for bone in inner_mch_drv:
+            if inner_mch_drv.index(bone) == len(inner_mch_drv) - 1:
+                subtarget = head_ctrl_name
+            else:
+                subtarget = mch_drv_bones[inner_mch_drv.index(bone) + 1]
+
+            constraint_data[bone].append( { 'constraint' : 'DAMPED_TRACK',
+                                            'subtarget'  : subtarget       } )
+
+        # head mch drv following the head control
+        subtarget = head_ctrl_name
+        constraint_data[head_mch_drv_name].append( { 'constraint' : 'COPY_TRANSFORMS',
+                                                     'subtarget'  : subtarget          } )
+
+        # fk switch constraints
+        for bone, subtarget in zip( mch_drv_bones, fk_bones ):
+            constraint_data[bone].append( { 'constraint' : 'COPY_TRANSFORMS',
+                                            'subtarget'  : subtarget          } )
+        ## MCH constraints (4)
+        
+        subtarget_bones = [ hips_tweak_name  ] + back_tweak_names + neck_tweak_names + [ head_mch_drv_name ]
+        
+        for bone, subtarget in zip( mch_bones, subtarget_bones ):
+            constraint_data[bone] = [ { 'constraint' : 'DAMPED_TRACK',
+                                        'subtarget'  : subtarget       },
+                                      { 'constraint' : 'STRETCH_TO',
+                                        'subtarget'  : subtarget       } 
+                                    ]
+        
+        ## Deformation constraints (5)
+        subtarget_bones = mch_bones + [ head_mch_drv_name ]
+        
+        for bone, subtarget in zip( def_bones, subtarget_bones ):
+            constraint_data[bone] = [ { 'constraint' : 'COPY_TRANSFORMS',
+                                        'subtarget'  : subtarget          } ]
+        
+        
+                                            
+        
+                                     
 
     def assign_widgets(self):
         pass
