@@ -467,11 +467,8 @@ class Rig:
                 bone.parent = def_bones_e[ def_bones_e.index(bone) -1 ]
                 bone.use_connect = True
 
-    def make_constraint( self, owner_bone, target_bone, contraint_type ):
-        pass
 
-
-    def constraints_and_drivers( self, all_bones ):
+    def constraints_data( self, all_bones ):
         ## Big mama: the dictionary that contains all the information about the constraints
         constraint_data = {}
         
@@ -628,10 +625,40 @@ class Rig:
             constraint_data[bone] = [ { 'constraint' : 'COPY_TRANSFORMS',
                                         'subtarget'  : subtarget          } ]
         
-        
-                                            
-        
+        return constraint_data
+
                                      
+    def set_constraints( self, constraint_data ):
+        for bone in constraint_data.keys():
+            for constraint in constraint_data[bone]:
+                self.make_constraint(bone, constraint)
+
+
+    def make_constraint( self, bone, contraint ):
+        const_type = constraint['constraint']
+        subtarget  = constraint['subtarget']
+        
+        bpy.ops.object.mode_set(mode ='OBJECT')
+        pb = self.obj.pose.bones
+        
+        owner_pb = pb[bone]
+        const = owner_pb.constraints.new( const_type )
+        
+        const.target    = self.obj
+        const.subtarget = subtarget
+
+        # influence
+        if ( const_type == 'COPY_TRANSFORMS' or const_type == 'COPY_ROTATION' ) and constraint['influence']:
+            const.inlfuence = constraint['influence']
+
+        # head/tail
+        if ( const_type == 'COPY_TRANSFORMS' or 
+             const_type == 'COPY_LOCATION'   or
+             const_type == 'DAMPED_TRACK'    or
+             const_type == 'STRETCH_TO' )    and
+             constraint['head_tail']:
+            
+            const.head_tail = constraint['head_tail']
 
     def assign_widgets(self):
         pass
@@ -641,7 +668,9 @@ class Rig:
         
         all_bones = self.create_bones()
         self.parent_bones( all_bones )
-        #self.constraints_and_drivers()
+        constraint_data = self.constraints_data( all_bones )
+        self.set_constraints( constraint_data )
+        
         #self.assign_widgets()
 
 
