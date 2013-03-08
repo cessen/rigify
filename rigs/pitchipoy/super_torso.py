@@ -371,7 +371,7 @@ class Rig:
 
         # Parenting the back bones
         
-        spine_ctrl_name      = all_bones['back']['spine_ctrl']
+        spitorso_name = all_bones['torso']['ctrl']ne_ctrl_name      = all_bones['back']['spine_ctrl']
         ribs_mch_rot_name    = all_bones['back']['mch_rotation']
         ribs_ctrl_name       = all_bones['back']['ribs_ctrl']
         back_mch_str_name    = all_bones['back']['mch_stretch']
@@ -442,8 +442,7 @@ class Rig:
         
         # Parenting the fk bones
         fk_names = all_bones['fk']['fk_bones']
-        
-        
+
         fk_bones_e = [ eb[bone] for bone in fk_names ]
         
         for bone in fk_bones_e:
@@ -467,9 +466,67 @@ class Rig:
                 bone.parent = def_bones_e[ def_bones_e.index(bone) -1 ]
                 bone.use_connect = True
 
-
-    def constraints_and_drivers(self):
+    def make_constraint( self, owner_bone, target_bone, contraint_type ):
         pass
+
+
+    def constraints_and_drivers( self, all_bones ):
+        ## Big mama: the dictionary that contains all the information about the constraints
+        constraint_data = {}
+        
+        # MCH Rotation bone names (1)
+        ribs_mch_rot_name = all_bones['back']['mch_rotation']
+        neck_mch_rot_name = all_bones['neck']['mch_rotation']
+        head_mch_rot_name = all_bones['head']['mch_rotation']
+        
+        # MCH Stretch bone names (2)
+        back_mch_str_name = all_bones['back']['mch_stretch']
+        neck_mch_str_name = all_bones['neck']['mch_stretch']
+
+        # MCH DRV bone names (3)
+        hips_mch_drv_name  = all_bones['hips']['mch_drv']
+        back_mch_drv_names = all_bones['back']['mch_drv_bones']
+        neck_mch_drv_names = all_bones['neck']['mch_drv_bones']
+        head_mch_drv_name  = all_bones['head']['mch_drv']
+        
+        # MCH bone names (4)
+        hips_mch_name  = all_bones['hips']['mch']
+        back_mch_names = all_bones['back']['mch_bones']
+        neck_mch_names = all_bones['neck']['mch_bones']
+
+        # Deformation bone names (5)
+        def_names = all_bones['def']['def_bones']
+        
+        # Build contraint data dictionary
+        
+
+
+
+        mch_targets = {}
+        mch_owners_and_targets = {}
+        for mch in mch_names:
+            mch_owners_and_targets[mch] = { }
+            for tweak in tweak_names:
+                mch_targets[tweak] = [ 'DAMPED_TRACK', 'STRETCH_TO' ]
+            mch_targets[head_mch_drv_name] = [ 'DAMPED_TRACK', 'STRETCH_TO' ]
+
+
+
+        # MCH Rotation target bone names
+        spine_ctrl_name = all_bones['back']['spine_ctrl']
+        torso_name      = all_bones['torso']['ctrl']
+        neck_ctrl_name  = all_bones['neck']['ctrl']
+        ribs_ctrl_name  = all_bones['back']['ribs_ctrl']
+
+        mch_rot_owners_and_targets = {
+            # Owner           : target/s          : [ List of constraints on target    ]
+            ribs_mch_rot_name : { spine_ctrl_name : [ 'COPY_LOCATION', 'COPY_ROTATION' ] }
+            head_mch_rot_name : { ribs_ctrl_name  : [ 'COPY_LOCATION', 'COPY_ROTATION' ],
+                                  torso_name      : [ 'COPY_SCALE'                     ] } 
+            neck_mch_rot_name : { neck_ctrl_name  : [ 'COPY_LOCATION', 'COPY_ROTATION' ],
+                                  torso_name      : [ 'COPY_SCALE'                     ] }
+        }
+
 
 
     def assign_widgets(self):
