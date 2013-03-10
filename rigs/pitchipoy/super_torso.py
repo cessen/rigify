@@ -593,7 +593,7 @@ class Rig:
             if inner_mch_drv.index(bone) == len(inner_mch_drv) - 1:
                 subtarget = head_ctrl_name
             else:
-                subtarget = mch_drv_bones[inner_mch_drv.index(bone) + 1]
+                subtarget = mch_drv_bones[mch_drv_bones.index(bone) + 1]
 
             constraint_data[bone].append( { 'constraint' : 'DAMPED_TRACK',
                                             'subtarget'  : subtarget       } )
@@ -609,7 +609,7 @@ class Rig:
                                             'subtarget'  : subtarget          } )
         ## MCH constraints (4)
         
-        subtarget_bones = [ hips_tweak_name  ] + back_tweak_names + neck_tweak_names + [ head_mch_drv_name ]
+        subtarget_bones = back_tweak_names + neck_tweak_names + [ head_mch_drv_name ]
         
         for bone, subtarget in zip( mch_bones, subtarget_bones ):
             constraint_data[bone] = [ { 'constraint' : 'DAMPED_TRACK',
@@ -634,7 +634,7 @@ class Rig:
                 self.make_constraint(bone, constraint)
 
 
-    def make_constraint( self, bone, contraint ):
+    def make_constraint( self, bone, constraint ):
         const_type = constraint['constraint']
         subtarget  = constraint['subtarget']
         
@@ -647,19 +647,17 @@ class Rig:
         const.target    = self.obj
         const.subtarget = subtarget
 
-        # influence
-        if ( const_type == 'COPY_TRANSFORMS' or const_type == 'COPY_ROTATION' ) and constraint['influence']:
+        try: 
             const.inlfuence = constraint['influence']
+        except:
+            pass
 
-        # head/tail
-        if ( const_type == 'COPY_TRANSFORMS' or 
-             const_type == 'COPY_LOCATION'   or
-             const_type == 'DAMPED_TRACK'    or
-             const_type == 'STRETCH_TO' )    and
-             constraint['head_tail']:
-            
+        try:
             const.head_tail = constraint['head_tail']
+        except:
+            pass
 
+                        
     def assign_widgets(self):
         pass
 
