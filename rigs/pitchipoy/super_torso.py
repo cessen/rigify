@@ -49,8 +49,23 @@ class Rig:
         ctrl_bone_e.tail[:] = ctrl_bone_e.head + tail_vec
         
         return { 'ctrl' : ctrl_bone }
+
+    def position_bones( self, anchor, bones, size = 1 ):
+
+        bpy.ops.object.mode_set(mode ='EDIT')
+        eb = self.obj.data.edit_bones        
+
+        anchor_e = eb[anchor]
+
+        no_of_bones     = len(bones)
+        distance_vector = ( anchor_e.tail - anchor_e.head ) / no_of_bones
         
-        
+        for i in range(no_of_bones):
+            bone_e         = eb[bones[i]]
+            bone_e.head[:] = anchor_e.head + distance_vector * i
+            bone_e.tail[:] = bone_e.head + distance_vector / size
+            bone_e.roll    = anchor_e.roll
+
     def create_hips( self ):
         """ Create the hip bones """
 
@@ -99,7 +114,7 @@ class Rig:
         
         return hips_dict
        
-        
+   
     def create_back( self ):
         org_bones = self.org_bones
 
@@ -116,62 +131,70 @@ class Rig:
         #     and use the parenting structure instead
         # first_spine_bone = [ bone for bone in spine_org_bones if 'hips' in bone.parent.name.lower() ].pop()        
 
+
         # Create spine ctrl bone
         spine_ctrl_name = strip_org( spine_org_bones[0] )
         
-        spine_ctrl_bone = copy_bone( self.obj, spine_org_bones[0], spine_ctrl_name )
-        spine_ctrl_bone_e = eb[spine_ctrl_bone]
-        spine_ctrl_bone_e.tail[:] = eb[spine_org_bones[-1]].tail
-        
+        spine_ctrl_name = copy_bone( self.obj, spine_org_bones[0], spine_ctrl_name )
+        spine_ctrl_bone_e = eb[spine_ctrl_name]
+
         # Create ribs ctrl bone
         ribs_ctrl_name = strip_org( ribs_org_bones[0] )
         
-        ribs_ctrl_bone = copy_bone( self.obj, ribs_org_bones[0], ribs_ctrl_name )
-        ribs_ctrl_bone_e = eb[ribs_ctrl_bone]
-        ribs_ctrl_bone_e.tail[:] = eb[ribs_org_bones[-1]].tail
+        ribs_ctrl_name = copy_bone( self.obj, ribs_org_bones[0], ribs_ctrl_name )
+        ribs_ctrl_bone_e = eb[ribs_ctrl_name]
 
-        # Create mechanism rotation bone
-        ribs_mch_rotation_name = make_mechanism_name( ribs_ctrl_name ) + '_rotation'
-        ribs_mch_rotation_name = copy_bone(self.obj, ribs_org_bones[0], ribs_mch_rotation_name )
-        ribs_mch_stretch_bone_e = eb[ribs_mch_rotation_name]
-        ribs_mch_stretch_bone_e.tail[:] = eb[ribs_org_bones[-1]].tail
-        
         # Create mechanism stretch bone
         spine_mch_stretch_name = make_mechanism_name( spine_ctrl_name ) + '_stretch'
         
         spine_mch_stretch_name = copy_bone( self.obj, spine_org_bones[0], spine_mch_stretch_name )
         spine_mch_stretch_bone_e = eb[spine_mch_stretch_name]
         spine_mch_stretch_bone_e.tail[:] = eb[ribs_org_bones[-1]].tail
+        
+        # Clearing out previous parenting save the org bones
+        for bone in eb:
+            #if bone.name not in org_bones:
+            bone.parent = None
+                
+        # Positioning the back control bones along the mch stretch bone (as the anchor)
+        self.position_bones( spine_mch_stretch_name, [ spine_ctrl_name, ribs_ctrl_name ] )
+
+        # Create mch rotation bones
+        mch_rot_bones = []
+        ribs_mch_rotation_name = make_mechanism_name( ribs_ctrl_name ) + '_rotation'
+        for i in range(2):
+            ribs_mch_rotation_name = copy_bone(self.obj, ribs_ctrl_name, ribs_mch_rotation_name )
+            mch_rot_bones.append( ribs_mch_rotation_name )
+
+        no_of_bones = len(back_org_bones)
 
         # Create mch_drv bone
-        no_of_bones = len(back_org_bones)    
-        distance_vector = ( eb[spine_mch_stretch_name].tail - eb[spine_mch_stretch_name].head ) / no_of_bones
-        
         mch_drv_bones = []        
         for i in range(no_of_bones):
-            mch_drv_name = make_mechanism_name( strip_org( back_org_bones[i] ) ) + '_DRV'
-            mch_drv_name = copy_bone( self.obj, spine_mch_stretch_name, mch_drv_name )
+            mch_drv_name   = make_mechanism_name( strip_org( back_org_bones[i] ) ) + '_DRV'
+            mch_drv_name   = copy_bone( self.obj, spine_mch_stretch_name, mch_drv_name )
             mch_drv_bone_e = eb[mch_drv_name]
-            mch_drv_bone_e.head[:] = eb[spine_mch_stretch_name].head + distance_vector * i
-            mch_drv_bone_e.tail[:] = mch_drv_bone_e.head + distance_vector / 4 
-            mch_drv_bone_e.roll    = spine_mch_stretch_bone_e.roll
             mch_drv_bones.append( mch_drv_name )
+
+        self.position_bones( spine_mch_stretch_name, mch_drv_bones, 4 )
         
         tweak_bones = []
         mch_bones   = []
         for org in back_org_bones:
-            
-            # Create tweak bone
+            # Create tweak bones
             tweak_name = strip_org(org)
             tweak_name = copy_bone(self.obj, org, tweak_name )
             tweak_bone_e = eb[tweak_name]
             tweak_bone_e.tail = tweak_bone_e.head + ( tweak_bone_e.tail - tweak_bone_e.head ) / 2
+            tweak_bone_e.parent = None 
 
             tweak_bones.append( tweak_name )
             
-            # Create mch bone
+            # Create mch bones
             mch_name = make_mechanism_name( strip_org(org) )
             mch_bone = copy_bone(self.obj, org, mch_name )
+            mch_bone_e = eb[tweak_name]
+            mch_bone_e.parent = None 
 
             mch_bones.append( mch_name )
 
@@ -179,7 +202,7 @@ class Rig:
             'spine_ctrl'    : spine_ctrl_name,
             'ribs_ctrl'     : ribs_ctrl_name,
             'mch_stretch'   : spine_mch_stretch_name,
-            'mch_rotation'  : ribs_mch_rotation_name,
+            'mch_rot_bones' : mch_rot_bones,
             'mch_drv_bones' : mch_drv_bones,
             'tweak_bones'   : tweak_bones,
             'mch_bones'     : mch_bones
@@ -206,9 +229,12 @@ class Rig:
         ctrl_bone_e.roll    = eb[neck_org_bones[0]].roll
         
         # Create mch rotation bone
+        mch_rot_bones = []
         mch_rotation_name = make_mechanism_name( ctrl_name ) + '_rotation'
-        mch_rotation_name = copy_bone(self.obj, ctrl_name, mch_rotation_name )
-        
+        for i in range(2):
+            mch_rotation_name = copy_bone(self.obj, ctrl_name, mch_rotation_name )
+            mch_rot_bones.append( mch_rotation_name )
+            
         # Create mch stretch bone
         mch_stretch_name = make_mechanism_name( ctrl_name ) + '_stretch'
         mch_stretch_name = copy_bone(self.obj, ctrl_name, mch_stretch_name )
@@ -218,13 +244,11 @@ class Rig:
         mch_bones     = []
         for org in neck_org_bones:
             # Create mch drv bones
-            mch_drv_name = make_mechanism_name( ctrl_name ) + '_DRV'
-            mch_drv_name = copy_bone( self.obj, org, mch_drv_name )
+            mch_drv_name   = make_mechanism_name( ctrl_name ) + '_DRV'
+            mch_drv_name   = copy_bone( self.obj, org, mch_drv_name )
             mch_drv_bone_e = eb[mch_drv_name]
-            mch_drv_bone_e.tail = mch_drv_bone_e.head + ( mch_drv_bone_e.tail - mch_drv_bone_e.head) / 4
+            mch_drv_bones.append( mch_drv_name )
 
-            mch_drv_bones.append(mch_drv_name)
-            
             # Create tweak bones
             tweak_name = copy_bone( self.obj, org, ctrl_name )
             tweak_bone_e = eb[tweak_name]
@@ -237,10 +261,12 @@ class Rig:
             
             mch_bones.append( mch_name )
         
+        self.position_bones( mch_stretch_name, mch_drv_bones, 4 )
+        
         neck_dict = {
             'ctrl'          : ctrl_name,
             'mch_stretch'   : mch_stretch_name,
-            'mch_rotation'  : mch_rotation_name,
+            'mch_rot_bones' : mch_rot_bones,
             'mch_drv_bones' : mch_drv_bones,
             'tweak_bones'   : tweak_bones,
             'mch_bones'     : mch_bones
@@ -260,8 +286,11 @@ class Rig:
         ctrl_name = copy_bone( self.obj, org_bones[-1], ctrl_name )
         
         # Create mch rotation bone
+        mch_rot_bones = []
         mch_rotation_name = make_mechanism_name( ctrl_name ) + '_rotation'
-        mch_rotation_name = copy_bone( self.obj, org_bones[-1], mch_rotation_name )
+        for i in range(2):
+            mch_rotation_name = copy_bone(self.obj, ctrl_name, mch_rotation_name )
+            mch_rot_bones.append( mch_rotation_name )
         
         # Create mch drv bone
         mch_drv_name = make_mechanism_name( ctrl_name ) + '_DRV'
@@ -270,15 +299,15 @@ class Rig:
         mch_drv_bone_e.tail = mch_drv_bone_e.head + ( mch_drv_bone_e.tail - mch_drv_bone_e.head) / 4
 
         head_dict = {
-            'ctrl'         : ctrl_name, 
-            'mch_rotation' : mch_rotation_name, 
-            'mch_drv'      : mch_drv_name 
+            'ctrl'          : ctrl_name, 
+            'mch_rot_bones' : mch_rot_bones, 
+            'mch_drv'       : mch_drv_name 
         }
         
         return head_dict
 
 
-    def create_fk( self ):
+    def create_fk( self, anchor_back, anchor_neck):
         org_bones = self.org_bones
 
         bpy.ops.object.mode_set(mode ='EDIT')
@@ -295,9 +324,14 @@ class Rig:
                 bpy.ops.armature.select_all(action='DESELECT')
                 eb[fk_name].select = True
                 bpy.ops.armature.switch_direction()
+        
+        back_fk_bones = [ name for name in fk_bones if 'spine' in name or 'ribs' in name ]
+        self.position_bones( anchor_back, back_fk_bones )
+        
+        neck_fk_bones = [ name for name in fk_bones if 'neck' in name ]
+        self.position_bones( anchor_neck, neck_fk_bones )
 
         return { 'fk_bones' : fk_bones }
-    
     
     def create_deformation( self ):
         org_bones = self.org_bones
@@ -321,7 +355,7 @@ class Rig:
         back        = self.create_back()
         neck        = self.create_neck()
         head        = self.create_head()
-        fk          = self.create_fk()
+        fk          = self.create_fk( back['mch_stretch'], neck['mch_stretch'])
         deformation = self.create_deformation()
 
         all_bones = {
@@ -371,27 +405,28 @@ class Rig:
 
         # Parenting the back bones
         
-        torso_name = all_bones['torso']['ctrl']
-        spine_ctrl_name      = all_bones['back']['spine_ctrl']
-        ribs_mch_rot_name    = all_bones['back']['mch_rotation']
-        ribs_ctrl_name       = all_bones['back']['ribs_ctrl']
-        back_mch_str_name    = all_bones['back']['mch_stretch']
-        back_mch_drv_names   = all_bones['back']['mch_drv_bones']
-        back_tweak_names     = all_bones['back']['tweak_bones']
-        back_mch_names       = all_bones['back']['mch_bones']
+        torso_name         = all_bones['torso']['ctrl']
+        spine_ctrl_name    = all_bones['back']['spine_ctrl']
+        back_mch_rot_names = all_bones['back']['mch_rot_bones']
+        ribs_ctrl_name     = all_bones['back']['ribs_ctrl']
+        back_mch_str_name  = all_bones['back']['mch_stretch']
+        back_mch_drv_names = all_bones['back']['mch_drv_bones']
+        back_tweak_names   = all_bones['back']['tweak_bones']
+        back_mch_names     = all_bones['back']['mch_bones']
         
         spine_ctrl_bone_e    = eb[spine_ctrl_name]
-        ribs_mch_rot_bone_e  = eb[ribs_mch_rot_name]
+        back_mch_rot_bones_e = [ eb[name] for name in back_mch_rot_names ]
         ribs_ctrl_bone_e     = eb[ribs_ctrl_name]
         back_mch_str_bone_e  = eb[back_mch_str_name]
         back_mch_drv_bones_e = [ eb[bone] for bone in back_mch_drv_names ]
         back_tweak_bones_e   = [ eb[bone] for bone in back_tweak_names ]
         back_mch_bones_e     = [ eb[bone] for bone in back_mch_names ]
         
-        spine_ctrl_bone_e.parent   = torso_bone_e
-        ribs_mch_rot_bone_e.parent = torso_bone_e
-        ribs_ctrl_bone_e.parent    = ribs_mch_rot_bone_e
-        back_mch_str_bone_e.parent = hips_ctrl_bone_e
+        back_mch_rot_bones_e[0].parent = None
+        back_mch_rot_bones_e[1].parent = spine_ctrl_bone_e
+        spine_ctrl_bone_e.parent       = torso_bone_e
+        ribs_ctrl_bone_e.parent        = back_mch_rot_bones_e[0]
+        back_mch_str_bone_e.parent     = hips_ctrl_bone_e
         
         for drv, tweak, mch in zip( back_mch_drv_bones_e, back_tweak_bones_e, back_mch_bones_e ):
             
@@ -402,26 +437,26 @@ class Rig:
             
             tweak.parent = drv
             mch.parent   = tweak
-        
 
         # Parenting the neck bones
-        neck_mch_rot_name  = all_bones['neck']['mch_rotation']
+        neck_mch_rot_names = all_bones['neck']['mch_rot_bones']
         neck_ctrl_name     = all_bones['neck']['ctrl']
         neck_mch_str_name  = all_bones['neck']['mch_stretch']
         neck_mch_drv_names = all_bones['neck']['mch_drv_bones']
         neck_tweak_names   = all_bones['neck']['tweak_bones']
         neck_mch_names     = all_bones['neck']['mch_bones']
         
-        neck_mch_rot_bone_e  = eb[neck_mch_rot_name]
+        neck_mch_rot_bones_e = [ eb[name] for name in neck_mch_rot_names ]
         neck_ctrl_bone_e     = eb[neck_ctrl_name]
         neck_mch_str_bone_e  = eb[neck_mch_str_name]
         neck_mch_drv_bones_e = [ eb[bone] for bone in neck_mch_drv_names ]
         neck_tweak_bones_e   = [ eb[bone] for bone in neck_tweak_names ]
         neck_mch_bones_e     = [ eb[bone] for bone in neck_mch_names ]
         
-        neck_mch_rot_bone_e.parent = None  # Later rigify will parent to root
-        neck_ctrl_bone_e.parent    = neck_mch_rot_bone_e
-        neck_mch_str_bone_e.parent = neck_ctrl_bone_e
+        neck_mch_rot_bones_e[0].parent = None  # Later rigify will parent to root
+        neck_mch_rot_bones_e[1].parent = ribs_ctrl_bone_e
+        neck_ctrl_bone_e.parent        = neck_mch_rot_bones_e[0]
+        neck_mch_str_bone_e.parent     = neck_ctrl_bone_e
         
         for drv, tweak, mch in zip( neck_mch_drv_bones_e, neck_tweak_bones_e, neck_mch_bones_e ):
             drv.parent   = neck_mch_str_bone_e
@@ -429,17 +464,18 @@ class Rig:
             mch.parent   = tweak
         
         # Parenting the head bones
-        head_mch_rot_name = all_bones['head']['mch_rotation']
-        head_ctrl_name    = all_bones['head']['ctrl']
-        head_mch_drv_name = all_bones['head']['mch_drv']
+        head_mch_rot_names = all_bones['head']['mch_rot_bones']
+        head_ctrl_name     = all_bones['head']['ctrl']
+        head_mch_drv_name  = all_bones['head']['mch_drv']
 
-        head_mch_rot_bone_e = eb[head_mch_rot_name]
+        head_mch_rot_bones_e = [ eb[name] for name in head_mch_rot_names ]
         head_ctrl_bone_e    = eb[head_ctrl_name]
         head_mch_drv_bone_e = eb[head_mch_drv_name]
         
-        head_mch_rot_bone_e.parent = None  # Later rigify will parent to root
-        head_ctrl_bone_e.parent    = head_mch_rot_bone_e
-        head_mch_drv_bone_e.parent = head_mch_rot_bone_e
+        head_mch_rot_bones_e[0].parent = None  # Later rigify will parent to root
+        head_mch_rot_bones_e[1].parent = neck_ctrl_bone_e
+        head_ctrl_bone_e.parent        = head_mch_rot_bones_e[0]
+        head_mch_drv_bone_e.parent     = head_mch_rot_bones_e[0]
         
         # Parenting the fk bones
         fk_names = all_bones['fk']['fk_bones']
@@ -464,8 +500,15 @@ class Rig:
                 bone.parent = None # Later rigify will parent to root
             # While the rest use simple chain parenting
             else:
-                bone.parent = def_bones_e[ def_bones_e.index(bone) -1 ]
+                bone.parent = def_bones_e[ def_bones_e.index(bone) - 1 ]
                 bone.use_connect = True
+                
+        # Parenting the org bones (back again :-( )
+        for bone in org_bones:
+            if org_bones.index(bone) == 0:
+                eb[bone].parent = None # Later rigify will parent to root
+            else:
+                eb[bone].parent = eb[ org_bones[ org_bones.index(bone) - 1 ] ]
 
 
     def constraints_data( self, all_bones ):
@@ -473,11 +516,11 @@ class Rig:
         constraint_data = {}
         
         # MCH Rotation bone names (1)
-        ribs_mch_rot_name = all_bones['back']['mch_rotation']
-        neck_mch_rot_name = all_bones['neck']['mch_rotation']
-        head_mch_rot_name = all_bones['head']['mch_rotation']
-        
-        mch_rot_bones = [ ribs_mch_rot_name, neck_mch_rot_name, head_mch_rot_name ]
+        ribs_mch_rot_names = all_bones['back']['mch_rot_bones']
+        neck_mch_rot_names = all_bones['neck']['mch_rot_bones']
+        head_mch_rot_names = all_bones['head']['mch_rot_bones']
+
+        owner_mch_rot_bones = [ ribs_mch_rot_names[0], neck_mch_rot_names[0], head_mch_rot_names[0] ]
         
         # MCH Stretch bone names (2)
         back_mch_str_name = all_bones['back']['mch_stretch']
@@ -520,21 +563,20 @@ class Rig:
         ### Build contraint data dictionary
         
         ## MCH Rotation constraints (1)
-        subtarget_bones = [ spine_ctrl_name, ribs_ctrl_name, neck_ctrl_name ] 
+        subtarget_ctrl_bones    = [ spine_ctrl_name, ribs_ctrl_name, neck_ctrl_name ] 
+        subtarget_mch_rot_bones = [ ribs_mch_rot_names[1], neck_mch_rot_names[1], head_mch_rot_names[1] ]
         
         # Copy_Loc and Copy_Rot for all bones:
-        for bone, subtarget in zip( mch_rot_bones, subtarget_bones ):
+        for bone, subtarget_ctrl, subtarget_mch_rot in zip( owner_mch_rot_bones, subtarget_ctrl_bones, subtarget_mch_rot_bones ):
             constraint_data[bone] = [ { 'constraint': 'COPY_LOCATION',
-                                        'subtarget' : subtarget,
-                                        'head_tail' : 1.0              },
+                                        'subtarget' : subtarget_ctrl,
+                                        'head_tail' : 1.0               },
                                       { 'constraint': 'COPY_ROTATION', 
-                                        'subtarget' : subtarget        }                    
+                                        'subtarget' : subtarget_mch_rot },
+                                      { 'constraint': 'COPY_SCALE',
+                                        'subtarget' : torso_name        }                    
                                     ]
-            # Copy_scale for the last two bones:
-            if mch_rot_bones.index(bone) != 0:
-                 constraint_data[bone].append( { 'constraint': 'COPY_SCALE',
-                                                 'subtarget' : torso_name    } )
-        
+
         ## MCH Stretch constraints (2)
         subtarget_bones = [ ribs_ctrl_name, head_ctrl_name ]
         
@@ -562,7 +604,7 @@ class Rig:
         for bone in back_mch_drv_names:
             if back_mch_drv_names.index(bone) != 0:
                 head_tail = back_mch_drv_names.index(bone) * factor
-                influence = 1 - head_tail
+                influence = 1.0 - head_tail
                 constraint_data[bone].append( { 'constraint' : 'COPY_TRANSFORMS',
                                                 'subtarget'  : subtarget,
                                                 'head_tail'  : head_tail,
@@ -579,16 +621,16 @@ class Rig:
         subtarget = head_ctrl_name
         factor = 1 / len(neck_mch_drv_names)
         
+        i = 1
         for bone in neck_mch_drv_names:
             if neck_mch_drv_names.index(bone) != 0:
-                
-                head_tail = neck_mch_drv_names.index(bone) * factor
+                influence = float(i * factor)
                 constraint_data[bone].append( { 'constraint' : 'COPY_ROTATION',
                                                 'subtarget'  : subtarget,
-                                                'influence'  : influence         } )
-        
+                                                'influence'  : influence       } )
+                i += 1
         # each back mch_drv following the next in line
-        inner_mch_drv = mch_drv_bones[1:-2]
+        inner_mch_drv = mch_drv_bones[1:-1]
         for bone in inner_mch_drv:
             if inner_mch_drv.index(bone) == len(inner_mch_drv) - 1:
                 subtarget = head_ctrl_name
@@ -607,6 +649,11 @@ class Rig:
         for bone, subtarget in zip( mch_drv_bones, fk_bones ):
             constraint_data[bone].append( { 'constraint' : 'COPY_TRANSFORMS',
                                             'subtarget'  : subtarget          } )
+            
+            if mch_drv_bones.index(bone) == 0:
+                constraint_data[bone][-1]['head_tail'] = 1.0
+        
+        
         ## MCH constraints (4)
         
         subtarget_bones = back_tweak_names + neck_tweak_names + [ head_mch_drv_name ]
@@ -647,8 +694,8 @@ class Rig:
         const.target    = self.obj
         const.subtarget = subtarget
 
-        try: 
-            const.inlfuence = constraint['influence']
+        try:
+            const.influence = constraint['influence']
         except:
             pass
 
