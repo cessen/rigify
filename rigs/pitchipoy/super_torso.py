@@ -2,7 +2,7 @@ import bpy
 from mathutils import Vector
 from ...utils import copy_bone
 from ...utils import strip_org, make_deformer_name, connected_children_names, make_mechanism_name
-from ...utils import create_circle_widget, create_sphere_widget, create_widget
+from ...utils import create_circle_widget, create_sphere_widget, create_widget, create_cube_widget
 from ...utils import MetarigError
 from rna_prop_ui import rna_idprop_ui_prop_get
 
@@ -705,8 +705,45 @@ class Rig:
             pass
 
                         
-    def assign_widgets(self):
-        pass
+    def assign_widgets(self, all_bones):
+        
+        bpy.ops.object.mode_set(mode ='OBJECT')
+        pb = self.obj.pose.bones
+        
+        # Referencing the all animatable bones
+        
+        torso_name      = all_bones['torso']['ctrl']
+        
+        hips_ctrl_name  = all_bones['hips']['ctrl']
+        spine_ctrl_name = all_bones['back']['spine_ctrl']
+        ribs_ctrl_name  = all_bones['back']['ribs_ctrl']
+        neck_ctrl_name  = all_bones['neck']['ctrl']
+        head_ctrl_name  = all_bones['head']['ctrl']
+        
+        control_names = [ hips_ctrl_name, spine_ctrl_name, ribs_ctrl_name, neck_ctrl_name, head_ctrl_name ]
+        
+        hips_tweak_name  = all_bones['hips']['tweak']
+        back_tweak_names = all_bones['back']['tweak_bones']
+        neck_tweak_names = all_bones['neck']['tweak_bones']
+        
+        tweak_names = [ hips_tweak_name ] + back_tweak_names + neck_tweak_names
+        
+        fk_names = all_bones['fk']['fk_bones']
+        
+        # Assigning a widget to torso bone
+        create_cube_widget(self.obj, torso_name, radius=0.5, bone_transform_name=None)
+        
+        # Assigning widgets to control bones
+        for bone in control_names:
+            create_circle_widget(self.obj, bone, radius=1.0, head_tail=0.5, with_line=False, bone_transform_name=None)
+        
+        # Assigning widgets to tweak bones
+        for bone in tweak_names:
+            create_sphere_widget(self.obj, bone, bone_transform_name=None)
+        
+        # Assigning widgets to fk bones
+        for bone in fk_names:
+            create_circle_widget(self.obj, bone, radius=1.0, head_tail=0.5, with_line=False, bone_transform_name=None)
 
 
     def generate(self):
@@ -715,20 +752,23 @@ class Rig:
         self.parent_bones( all_bones )
         constraint_data = self.constraints_data( all_bones )
         self.set_constraints( constraint_data )
-        
-        #self.assign_widgets()
+        self.assign_widgets( all_bones )
 
 
 def add_parameters(params):
     """ Add the parameters of this rig type to the
         RigifyParameters PropertyGroup
     """
- 
+    # varifying the name of the torso bone
     params.torso_name = bpy.props.StringProperty(
         name="torso_name", 
         default="torso",
         description="The name of the torso master control bone"
         )
+
+    # Setting up extra layers for the FK and tweak
+    #params.separate_extra_layers = bpy.props.BoolProperty(name="Separate Secondary Control Layers:", default=False, description="Enable putting the secondary controls on a separate layer from the primary controls")
+    #params.extra_layers = bpy.props.BoolVectorProperty(size=32, description="Layers for the secondary controls to be on")
 
 
 def parameters_ui(layout, params):
