@@ -21,6 +21,8 @@ class Rig:
         self.obj = obj
         self.org_bones = [bone_name] + connected_children_names(obj, bone_name)
         self.params = params
+        self.tweak_layers = list(params.tweak_layers)
+        self.fk_layers = list(params.fk_layers)
         
         if len(self.org_bones) <= 4:
             raise MetarigError("RIGIFY ERROR: Bone '%s': listen bro, that torso rig jusaint put tugetha rite. A little hint, use at least five bones!!" % (strip_org(bone_name)))            
@@ -50,6 +52,7 @@ class Rig:
         
         return { 'ctrl' : ctrl_bone }
 
+
     def position_bones( self, anchor, bones, size = 1 ):
 
         bpy.ops.object.mode_set(mode ='EDIT')
@@ -65,6 +68,7 @@ class Rig:
             bone_e.head[:] = anchor_e.head + distance_vector * i
             bone_e.tail[:] = bone_e.head + distance_vector / size
             bone_e.roll    = anchor_e.roll
+
 
     def create_hips( self ):
         """ Create the hip bones """
@@ -823,13 +827,16 @@ class Rig:
         for bone in control_names:
             create_circle_widget(self.obj, bone, radius=1.25, head_tail=0.5, with_line=False, bone_transform_name=None)
         
-        # Assigning widgets to tweak bones
+        # Assigning widgets to tweak bones and layers
         for bone in tweak_names:
             create_sphere_widget(self.obj, bone, bone_transform_name=None)
+            pb[bone].bone.layers = self.tweak_layers
         
-        # Assigning widgets to fk bones
+        # Assigning widgets to fk bones and layers
         for bone in fk_names:
             create_circle_widget(self.obj, bone, radius=1.0, head_tail=0.5, with_line=False, bone_transform_name=None)
+            pb[bone].bone.layers = self.fk_layers
+        
 
 
     def generate(self):
@@ -855,10 +862,10 @@ def add_parameters(params):
         description="The name of the torso master control bone"
         )
 
-    # Setting up extra layers for the FK and tweak
-    #params.separate_extra_layers = bpy.props.BoolProperty(name="Separate Secondary Control Layers:", default=False, description="Enable putting the secondary controls on a separate layer from the primary controls")
-    #params.extra_layers = bpy.props.BoolVectorProperty(size=32, description="Layers for the secondary controls to be on")
-
+    #Setting up extra layers for the FK and tweak
+    params.tweak_layers = bpy.props.BoolVectorProperty(size=32, description="Layers for the FK controls to be on")
+    params.fk_layers = bpy.props.BoolVectorProperty(size=32, description="Layers for the FK controls to be on")
+    
 
 def parameters_ui(layout, params):
     """ Create the ui for the rig parameters."""
