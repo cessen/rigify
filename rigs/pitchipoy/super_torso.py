@@ -1,6 +1,6 @@
 import bpy
 from mathutils import Vector
-from ...utils import copy_bone
+from ...utils import copy_bone, flip_bone
 from ...utils import strip_org, make_deformer_name, connected_children_names, make_mechanism_name
 from ...utils import create_circle_widget, create_sphere_widget, create_widget, create_cube_widget
 from ...utils import MetarigError
@@ -94,9 +94,7 @@ class Rig:
         ctrl_bone_e = eb[ctrl_bone]
         
         # Flip the hips' direction to create a more natural pivot for rotation
-        bpy.ops.armature.select_all(action='DESELECT')
-        ctrl_bone_e.select = True
-        bpy.ops.armature.switch_direction()
+        flip_bone(self.obj, ctrl_bone)
         
         # Create mch
         mch_bone   = copy_bone(self.obj, hip_org_name, make_mechanism_name(ctrl_name) )
