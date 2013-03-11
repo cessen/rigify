@@ -554,6 +554,8 @@ class Rig:
         ## Big mama: the dictionary that contains all the information about the constraints
         constraint_data = {}
         
+        org_bones = self.org_bones
+        
         # MCH Rotation bone names (1)
         ribs_mch_rot_names = all_bones['back']['mch_rot_bones']
         neck_mch_rot_names = all_bones['neck']['mch_rot_bones']
@@ -711,8 +713,13 @@ class Rig:
             constraint_data[bone] = [ { 'constraint' : 'COPY_TRANSFORMS',
                                         'subtarget'  : subtarget          } ]
         
+        ## ORG constrained to def ...
+        for bone, subtarget in zip( org_bones, def_bones ):
+            constraint_data[bone] = [ { 'constraint' : 'COPY_TRANSFORMS',
+                                        'subtarget'  : subtarget          } ]
+        
         return constraint_data
-
+        
                                      
     def set_constraints( self, constraint_data ):
         for bone in constraint_data.keys():
