@@ -331,9 +331,7 @@ class Rig:
             fk_bones.append( fk_name )
             if org_bones.index(org) == 0:
                 # Flip the hips' direction to create a more natural pivot for rotation
-                bpy.ops.armature.select_all(action='DESELECT')
-                eb[fk_name].select = True
-                bpy.ops.armature.switch_direction()
+                flip_bone( self.obj, fk_name )
         
         back_fk_bones = [ name for name in fk_bones if 'spine' in name or 'ribs' in name ]
         self.position_bones( anchor_back, back_fk_bones )
