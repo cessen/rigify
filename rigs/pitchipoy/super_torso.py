@@ -511,6 +511,33 @@ class Rig:
                 eb[bone].parent = eb[ org_bones[ org_bones.index(bone) - 1 ] ]
 
 
+    def bone_properties( self, all_bones ):
+        ## Setting all the properties of the bones relevant to posemode
+        
+        bpy.ops.object.mode_set(mode ='OBJECT')
+        pb = self.obj.pose.bones
+        
+        # Referencing relevant bones
+        hips_tweak_name  = all_bones['hips']['tweak']
+        back_tweak_names = all_bones['back']['tweak_bones']
+        neck_tweak_names = all_bones['neck']['tweak_bones']
+        
+        tweak_names = [ hips_tweak_name ] + back_tweak_names + neck_tweak_names
+        
+        def_names = all_bones['def']['def_bones']
+        
+        # deformation bones bbone segements
+        
+        for bone in def_names[1:-1]:
+            
+            self.obj.data.bones[bone].bbone_segments = 8
+        
+        # control locks - tweak bones
+        for bone in tweak_names:
+            pb[bone].lock_rotation = True, False, True
+            pb[bone].lock_scale    = False, True, False
+
+
     def constraints_data( self, all_bones ):
         ## Big mama: the dictionary that contains all the information about the constraints
         constraint_data = {}
@@ -752,7 +779,9 @@ class Rig:
         self.parent_bones( all_bones )
         constraint_data = self.constraints_data( all_bones )
         self.set_constraints( constraint_data )
+        self.bone_properties( all_bones )
         self.assign_widgets( all_bones )
+       
 
 
 def add_parameters(params):
