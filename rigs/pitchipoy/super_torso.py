@@ -731,8 +731,67 @@ class Rig:
         except:
             pass
 
+
+    def drivers_and_props( self, all_bones ):
+        
+        bpy.ops.object.mode_set(mode ='OBJECT')
+        pb = self.obj.pose.bones
+        
+        # Referencing all relevant bones
+        torso_name = all_bones['torso']['ctrl']
+        pb_torso = pb[torso_name]
+        
+        ribs_mch_rot_names = all_bones['back']['mch_rot_bones']
+        neck_mch_rot_names = all_bones['neck']['mch_rot_bones']
+        head_mch_rot_names = all_bones['head']['mch_rot_bones']
+
+        owner_mch_rot_bones = [ ribs_mch_rot_names[0], neck_mch_rot_names[0], head_mch_rot_names[0] ]
+        
+        hips_mch_drv_name  = all_bones['hips']['mch_drv']
+        back_mch_drv_names = all_bones['back']['mch_drv_bones']
+        neck_mch_drv_names = all_bones['neck']['mch_drv_bones']
+        head_mch_drv_name  = all_bones['head']['mch_drv']
+        
+        mch_drv_bones = [ hips_mch_drv_name ] + back_mch_drv_names + neck_mch_drv_names + [ head_mch_drv_name ]
+        
+        
+        # Setting the torso's props
+        props_list = [ "ribs_follow", "neck_follow", "head_follow", "IK/FK" ]
+        
+        for prop in props_list:
+            
+            pb_torso[prop] = 1.0
+            prop = rna_idprop_ui_prop_get( pb_torso, prop )
+            prop["min"] = 0.0
+            prop["max"] = 1.0
+            prop["soft_min"] = 0.0
+            prop["soft_max"] = 1.0
+            prop["description"] = prop
+        
+        # driving the follow rotation switches for ribs neck and head
+        for bone, prop, in zip( owner_mch_rot_bones, props_list[:-1] ):
+            drv = pb[ bone ].constraints[ 1 ].driver_add("influence").driver
+            drv.type='SUM'
+            
+            var = drv.variables.new()
+            var.name = prop
+            var.type = "SINGLE_PROP"
+            var.targets[0].id = self.obj
+            var.targets[0].data_path = pb_torso.path_from_id() + '['+ '"' + prop + '"' + ']'
+
+        # driving the fk switch
+        for bone in mch_drv_bones:
+            drv = pb[ bone ].constraints[ -1 ].driver_add("influence").driver
+            drv.type='SUM'
+            
+            var = drv.variables.new()
+            var.name = "fk_switch"
+            var.type = "SINGLE_PROP"
+            var.targets[0].id = self.obj
+            var.targets[0].data_path = pb_torso.path_from_id() + '["IK/FK"]'
+
                         
-    def assign_widgets(self, all_bones):
+    def assign_widgets( self, all_bones ):
         
         bpy.ops.object.mode_set(mode ='OBJECT')
         pb = self.obj.pose.bones
@@ -762,7 +821,7 @@ class Rig:
         
         # Assigning widgets to control bones
         for bone in control_names:
-            create_circle_widget(self.obj, bone, radius=1.0, head_tail=0.5, with_line=False, bone_transform_name=None)
+            create_circle_widget(self.obj, bone, radius=1.25, head_tail=0.5, with_line=False, bone_transform_name=None)
         
         # Assigning widgets to tweak bones
         for bone in tweak_names:
@@ -780,6 +839,7 @@ class Rig:
         constraint_data = self.constraints_data( all_bones )
         self.set_constraints( constraint_data )
         self.bone_properties( all_bones )
+        self.drivers_and_props( all_bones )
         self.assign_widgets( all_bones )
        
 
