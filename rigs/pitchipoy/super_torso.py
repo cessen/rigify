@@ -146,11 +146,17 @@ class Rig:
         spine_ctrl_name = copy_bone( self.obj, spine_org_bones[0], spine_ctrl_name )
         spine_ctrl_bone_e = eb[spine_ctrl_name]
         
+        ### *** Bug Fix --> Disappearing bone ***
+        spine_ctrl_bone_e.parent = None
+        
         # Create ribs ctrl bone
         ribs_ctrl_name = strip_org( ribs_org_bones[0] )
         
         ribs_ctrl_name = copy_bone( self.obj, ribs_org_bones[0], ribs_ctrl_name )
         ribs_ctrl_bone_e = eb[ribs_ctrl_name]
+        
+        ### *** Bug Fix --> Disappearing bone ***
+        ribs_ctrl_bone_e.parent = None
         
         # Create mechanism stretch bone
         spine_mch_stretch_name = make_mechanism_name( spine_ctrl_name ) + '_stretch'
@@ -159,10 +165,14 @@ class Rig:
         spine_mch_stretch_bone_e = eb[spine_mch_stretch_name]
         spine_mch_stretch_bone_e.tail[:] = eb[ribs_org_bones[-1]].tail
         
+        ### *** Bug Fix --> Disappearing bone ***
+        spine_mch_stretch_bone_e.parent = None
+        
         # Clearing out previous parenting save the org bones
-        for bone in eb:
-            #if bone.name not in org_bones:
-            bone.parent = None
+        #for bone in eb:
+        #    if bone.name not in org_bones:
+        #        bone.parent = None
+        ## !!!! Breaks parenting thru the entire rig including it's rig types !!!!
         
         # Positioning the back control bones along the mch stretch bone (as the anchor)
         self.position_bones( spine_mch_stretch_name, [ spine_ctrl_name, ribs_ctrl_name ] )
@@ -198,10 +208,15 @@ class Rig:
             
             tweak_bones.append( tweak_name )
             
+            ### *** Bug Fix --> Disappearing bone ***
+            mch_drv_bone_e.parent = None
+            
             # Create mch bones
             mch_name = make_mechanism_name( strip_org(org) )
             mch_bone = copy_bone(self.obj, org, mch_name )
-            mch_bone_e = eb[tweak_name]
+            mch_bone_e = eb[mch_name]
+            
+            ### *** Bug Fix --> Disappearing bone ***
             mch_bone_e.parent = None 
             
             mch_bones.append( mch_name )
@@ -225,7 +240,7 @@ class Rig:
         bpy.ops.object.mode_set(mode ='EDIT')
         eb = self.obj.data.edit_bones
         
-        neck_org_bones = sorted([ bone for bone in org_bones if 'neck' in bone.lower() ], key=str.lower )
+        neck_org_bones = sorted( [ bone for bone in org_bones if 'neck' in bone.lower() ], key=str.lower )
         
         # Create ctrl bone
         ctrl_name = strip_org( neck_org_bones[0] )
@@ -235,6 +250,9 @@ class Rig:
         ctrl_bone_e.head[:] = eb[neck_org_bones[0]].head
         ctrl_bone_e.tail[:] = eb[neck_org_bones[-1]].tail
         ctrl_bone_e.roll    = eb[neck_org_bones[0]].roll
+        
+        ### *** Bug Fix --> Disappearing bone ***
+        ctrl_bone_e.parent = None
         
         # Create mch rotation bone
         mch_rot_bones = []
@@ -247,6 +265,13 @@ class Rig:
         mch_stretch_name = make_mechanism_name( ctrl_name ) + '_stretch'
         mch_stretch_name = copy_bone(self.obj, ctrl_name, mch_stretch_name )
         
+        ### *** Bug Fix --> Disappearing bone ***
+        mch_stretch_e = eb[mch_stretch_name]
+        mch_stretch_e.parent = None
+        
+        #bpy.ops.object.mode_set(mode='OBJECT')
+        #bpy.ops.object.mode_set(mode='EDIT')
+        
         mch_drv_bones = []
         tweak_bones   = []
         mch_bones     = []
@@ -257,15 +282,25 @@ class Rig:
             mch_drv_bone_e = eb[mch_drv_name]
             mch_drv_bones.append( mch_drv_name )
             
+            ### *** Bug Fix --> Disappearing bone ***
+            mch_drv_bone_e.parent = None
+            
             # Create tweak bones
             tweak_name = copy_bone( self.obj, org, ctrl_name )
             tweak_bone_e = eb[tweak_name]
             tweak_bone_e.tail = tweak_bone_e.head + ( tweak_bone_e.tail - tweak_bone_e.head ) / 2
             
+            ### *** Bug Fix --> Disappearing bone ***
+            tweak_bone_e.parent = None
+            
             tweak_bones.append( tweak_name )
             # Create mch bones
             mch_name = make_mechanism_name( ctrl_name )
             mch_name = copy_bone( self.obj, org, mch_name )
+            
+            ### *** Bug Fix --> Disappearing bone ***
+            mch_bone_e = eb[mch_name]
+            mch_bone_e.parent = None
             
             mch_bones.append( mch_name )
             
@@ -292,6 +327,11 @@ class Rig:
         # Create ctrl bone
         ctrl_name = strip_org( org_bones[-1] )
         ctrl_name = copy_bone( self.obj, org_bones[-1], ctrl_name )
+        ctrl_bone_e = eb[ctrl_name]
+        
+        ### *** Bug Fix --> Disappearing bone ***
+        ctrl_bone_e = eb[ctrl_name]
+        ctrl_bone_e.parent = None
         
         # Create mch rotation bone
         mch_rot_bones = []
@@ -305,6 +345,9 @@ class Rig:
         mch_drv_name = copy_bone( self.obj, org_bones[-1], mch_drv_name )
         mch_drv_bone_e = eb[mch_drv_name]
         mch_drv_bone_e.tail = mch_drv_bone_e.head + ( mch_drv_bone_e.tail - mch_drv_bone_e.head) / 4
+        
+        ### *** Bug Fix --> Disappearing bone ***
+        mch_drv_bone_e.parent = None
         
         head_dict = {
             'ctrl'          : ctrl_name, 
@@ -325,6 +368,10 @@ class Rig:
         for org in org_bones:
             fk_name = strip_org( org ) + 'FK'
             fk_name = copy_bone( self.obj, org, fk_name )
+            
+            ### *** Bug Fix --> Disappearing bone ***
+            fk_bone_e = eb[fk_name]
+            fk_bone_e.parent = None
             
             fk_bones.append( fk_name )
             if org_bones.index(org) == 0:
@@ -384,9 +431,10 @@ class Rig:
         eb = self.obj.data.edit_bones
         
         # Clearing out previous parenting save the org bones
-        for bone in eb:
-            if bone.name not in org_bones:
-                bone.parent = None
+        #for bone in eb:
+        #    if bone.name not in org_bones:
+        #        bone.parent = None
+        ## !!!! Breaks parenting thru the entire rig including it's rig types !!!!
         
         # Parenting the torso and its children
         torso_name = all_bones['torso']['ctrl']
@@ -491,8 +539,8 @@ class Rig:
         fk_bones_e = [ eb[bone] for bone in fk_names ]
         
         for bone in fk_bones_e:
-            # Hips and spine fk are parented directly to the torso bone 
-            if fk_bones_e.index(bone) == 0 or fk_bones_e.index(bone) == 1:
+            # Hips fk  parented directly to the torso bone 
+            if fk_bones_e.index(bone) == 0:
                 bone.parent = torso_bone_e
             # While the rest use simple chain parenting
             else:
