@@ -100,24 +100,31 @@ class Rig:
         mch_bone   = copy_bone(self.obj, hip_org_name, make_mechanism_name(ctrl_name) )
         
         # Create tweak
-        #tweak_bone = copy_bone(self.obj, hip_org_name, ctrl_name )
+        tweak_bone = copy_bone(self.obj, hip_org_name, ctrl_name )
         
         # Calculate the position of the tweak bone's tail,
         # make it continue on a straight line from the ctrl_bone
-        #tweak_bone_e = eb[tweak_bone]
-        #tweak_bone_e.head[:] = ctrl_bone_e.tail
-        #v1    = ctrl_bone_e.tail
-        #v2    = ctrl_bone_e.head
-        #v_avg = (( v1 + v2 ) / -4)  # 25% of the ctrl_bone's size
-        #tweak_bone_e.tail[:] = v_avg
+        tweak_bone_e = eb[tweak_bone]
+        tweak_bone_e.head[:] = ctrl_bone_e.tail
+        v1    = ctrl_bone_e.tail
+        v2    = ctrl_bone_e.head
+        v_avg = (( v1 + v2 ) / -4)  # 25% of the ctrl_bone's size
+        tweak_bone_e.tail[:] = v_avg
+        
+        ### *** Bug Fix --> Disappearing bone ***
+        tweak_bone_e.parent = None
         
         # Create mch drv
-        mch_drv    = copy_bone(self.obj, ctrl_bone, make_mechanism_name(ctrl_name) + '_DRV' )
+        mch_drv = copy_bone(self.obj, ctrl_bone, make_mechanism_name(ctrl_name) + '_DRV' )
+        
+        ### *** Bug Fix --> Disappearing bone ***
+        mch_drv_bone_e = eb[mch_drv]
+        mch_drv_bone_e.parent = None
         
         hips_dict = {
             'ctrl'    : ctrl_bone, 
             'mch'     : mch_bone, 
-            #'tweak'   : tweak_bone, 
+            'tweak'   : tweak_bone, 
             'mch_drv' : mch_drv 
         }
         
@@ -445,19 +452,18 @@ class Rig:
         
         hips_ctrl_name    = all_bones['hips']['ctrl']
         hips_mch_drv_name = all_bones['hips']['mch_drv']
-        #hips_tweak_name   = all_bones['hips']['tweak']
+        hips_tweak_name   = all_bones['hips']['tweak']
         hips_mch_name     = all_bones['hips']['mch']
         
         hips_ctrl_bone_e    = eb[hips_ctrl_name]
         hips_mch_drv_bone_e = eb[hips_mch_drv_name]
-        #hips_tweak_bone_e   = eb[hips_tweak_name]
+        hips_tweak_bone_e   = eb[hips_tweak_name]
         hips_mch_bone_e     = eb[hips_mch_name]
         
         hips_ctrl_bone_e.parent    = torso_bone_e
         hips_mch_drv_bone_e.parent = hips_ctrl_bone_e
-        #hips_tweak_bone_e.parent   = hips_mch_drv_bone_e
-        #hips_mch_bone_e.parent     = hips_tweak_bone_e
-        hips_mch_bone_e.parent     = hips_mch_drv_bone_e
+        hips_tweak_bone_e.parent   = hips_mch_drv_bone_e
+        hips_mch_bone_e.parent     = hips_tweak_bone_e
         
         # Parenting the back bones
         
@@ -574,11 +580,11 @@ class Rig:
         pb = self.obj.pose.bones
         
         # Referencing relevant bones
-        #hips_tweak_name  = all_bones['hips']['tweak']
+        hips_tweak_name  = all_bones['hips']['tweak']
         back_tweak_names = all_bones['back']['tweak_bones']
         neck_tweak_names = all_bones['neck']['tweak_bones']
-        #[ hips_tweak_name ] +
-        tweak_names =  back_tweak_names + neck_tweak_names
+        
+        tweak_names = [ hips_tweak_name ] + back_tweak_names + neck_tweak_names
         
         def_names = all_bones['def']['def_bones']
         
@@ -638,7 +644,7 @@ class Rig:
         neck_ctrl_name  = all_bones['neck']['ctrl']
         head_ctrl_name  = all_bones['head']['ctrl']
         
-        #hips_tweak_name  = all_bones['hips']['tweak']
+        hips_tweak_name  = all_bones['hips']['tweak']
         back_tweak_names = all_bones['back']['tweak_bones']
         neck_tweak_names = all_bones['neck']['tweak_bones']
         
@@ -734,8 +740,8 @@ class Rig:
             constraint_data[bone].append( { 'constraint' : 'COPY_TRANSFORMS',
                                             'subtarget'  : subtarget          } )
             
-            #if mch_drv_bones.index(bone) == 0:
-                #constraint_data[bone][-1]['head_tail'] = 1.0
+            if mch_drv_bones.index(bone) == 0:
+                constraint_data[bone][-1]['head_tail'] = 1.0
         
         
         ## MCH constraints (4)
@@ -756,8 +762,10 @@ class Rig:
             constraint_data[bone] = [ { 'constraint' : 'COPY_TRANSFORMS',
                                         'subtarget'  : subtarget          } ]
         
-        ## ORG constrained to def ...
-        for bone, subtarget in zip( org_bones, def_bones ):
+        ## ORG constrained to tweak ...
+        subtarget_bones = [ hips_tweak_name ] + back_tweak_names + neck_tweak_names + [ head_mch_drv_name ]
+        
+        for bone, subtarget in zip( org_bones, subtarget_bones ):
             constraint_data[bone] = [ { 'constraint' : 'COPY_TRANSFORMS',
                                         'subtarget'  : subtarget          } ]
         
@@ -869,12 +877,11 @@ class Rig:
         
         control_names = [ hips_ctrl_name, spine_ctrl_name, ribs_ctrl_name, neck_ctrl_name, head_ctrl_name ]
         
-        #hips_tweak_name  = all_bones['hips']['tweak']
+        hips_tweak_name  = all_bones['hips']['tweak']
         back_tweak_names = all_bones['back']['tweak_bones']
         neck_tweak_names = all_bones['neck']['tweak_bones']
         
-        #[ hips_tweak_name ]
-        tweak_names = back_tweak_names + neck_tweak_names
+        tweak_names = [ hips_tweak_name ] + back_tweak_names + neck_tweak_names
         
         fk_names = all_bones['fk']['fk_bones']
         
