@@ -122,9 +122,9 @@ class Rig:
         tweak_bone_e.tail[:] = v_avg
         
         ### *** Bug Fix --> Trying to register tweak bone in the pose library... ??? ***
-        bpy.ops.object.mode_set(mode ='OBJECT')
-        bpy.ops.object.mode_set(mode ='EDIT')
-        eb = self.obj.data.edit_bones
+        #bpy.ops.object.mode_set(mode ='OBJECT')
+        #bpy.ops.object.mode_set(mode ='EDIT')
+        #eb = self.obj.data.edit_bones
         
         # Create mch drv
         mch_drv = copy_bone(self.obj, tweak_bone, make_mechanism_name(ctrl_name) + '_DRV' )
@@ -720,7 +720,7 @@ class Rig:
         factor = 1 / len(back_mch_drv_names)
         
         for bone in back_mch_drv_names:
-            if back_mch_drv_names.index(bone) != 0:
+            if back_mch_drv_names.index(bone) != 0 or back_mch_drv_names.index(bone) != len(back_mch_drv_names) - 1:
                 head_tail = back_mch_drv_names.index(bone) * factor
                 influence = 1.0 - head_tail
                 constraint_data[bone].append( { 'constraint' : 'COPY_TRANSFORMS',
