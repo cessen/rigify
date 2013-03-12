@@ -121,8 +121,13 @@ class Rig:
         v_avg = (( v1 + v2 ) / -4)  # 25% of the ctrl_bone's size
         tweak_bone_e.tail[:] = v_avg
         
+        ### *** Bug Fix --> Trying to register tweak bone in the pose library... ??? ***
+        bpy.ops.object.mode_set(mode ='OBJECT')
+        bpy.ops.object.mode_set(mode ='EDIT')
+        eb = self.obj.data.edit_bones
+        
         # Create mch drv
-        mch_drv = copy_bone(self.obj, ctrl_bone, make_mechanism_name(tweak_bone) + '_DRV' )
+        mch_drv = copy_bone(self.obj, tweak_bone, make_mechanism_name(ctrl_name) + '_DRV' )
         
         ### *** Bug Fix --> Disappearing bone ***
         mch_drv_bone_e = eb[mch_drv]
@@ -583,13 +588,19 @@ class Rig:
                 bone.use_connect = True
         
         # Parenting the org bones (back again :-( )
-        for bone in org_bones:
-            if org_bones.index(bone) == 0:
-                eb[bone].parent = None # Later rigify will parent to root
-            else:
-                eb[bone].parent = eb[ org_bones[ org_bones.index(bone) - 1 ] ]
-
-
+        #for bone in org_bones:
+        #    if org_bones.index(bone) == 0:
+        #        eb[bone].parent = None # Later rigify will parent to root
+        #    else:
+        #        eb[bone].parent = eb[ org_bones[ org_bones.index(bone) - 1 ] ]
+        
+        ## Parenting the org bones to tweak
+        parent_bones = [ hips_tweak_name ] + back_tweak_names + neck_tweak_names + [ head_mch_drv_name ]
+        
+        for bone, parent in zip( org_bones, parent_bones ):
+            eb[bone].parent = eb[parent]
+        
+        
     def bone_properties( self, all_bones ):
         ## Setting all the properties of the bones relevant to posemode
         
@@ -779,12 +790,12 @@ class Rig:
             constraint_data[bone] = [ { 'constraint' : 'COPY_TRANSFORMS',
                                         'subtarget'  : subtarget          } ]
         
-        ## ORG constrained to tweak ...
-        subtarget_bones = [ hips_tweak_name ] + back_tweak_names + neck_tweak_names + [ head_mch_drv_name ]
+        ## ORG constrained to tweak ... not needed ??
+        #subtarget_bones = [ hips_tweak_name ] + back_tweak_names + neck_tweak_names + [ head_mch_drv_name ]
         
-        for bone, subtarget in zip( org_bones, subtarget_bones ):
-            constraint_data[bone] = [ { 'constraint' : 'COPY_TRANSFORMS',
-                                        'subtarget'  : subtarget          } ]
+        #for bone, subtarget in zip( org_bones, subtarget_bones ):
+        #    constraint_data[bone] = [ { 'constraint' : 'COPY_TRANSFORMS',
+        #                                'subtarget'  : subtarget          } ]
         
         return constraint_data
 
