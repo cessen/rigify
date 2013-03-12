@@ -86,8 +86,9 @@ class Rig:
         bpy.ops.object.mode_set(mode ='EDIT')
         eb = self.obj.data.edit_bones
         
-        hip_org_name  = org_bones[0]
-        ctrl_name     = strip_org(hip_org_name)
+        hip_org_name   = org_bones[0]
+        hip_org_bone_e = eb[hip_org_name]
+        ctrl_name      = strip_org(hip_org_name)
         
         # Create ctrl
         ctrl_bone  = copy_bone(self.obj, hip_org_name, ctrl_name )
@@ -98,7 +99,29 @@ class Rig:
         
         # Flip the hips' direction to create a more natural pivot for rotation
         flip_bone(self.obj, ctrl_name)
+
+        # Create mch drv
+        mch_drv_bone = copy_bone(self.obj, hip_org_name, make_mechanism_name(ctrl_name) + '_DRV' )
         
+        ### *** Bug Fix --> Disappearing bone ***
+        mch_drv_bone_e = eb[mch_drv_bone]
+        mch_drv_bone_e.parent = None
+
+        # Calculate the position of the tweak bone's tail,
+        # make it continue on a straight line from the ctrl_bone
+        mch_drv_bone_e.head[:] = hip_org_bone_e.head
+        v1    = hip_org_bone_e.head
+        v2    = hip_org_bone_e.tail
+        v_avg = (( v1 + v2 ) / -4)  # 25% of the ctrl_bone's size
+        mch_drv_bone_e.tail[:] = v_avg
+        
+        # Create tweak
+        tweak_bone   = copy_bone(self.obj, mch_drv_bone, ctrl_name )
+        tweak_bone_e = eb[tweak_bone]
+
+        ### *** Bug Fix --> Disappearing bone ***
+        tweak_bone_e.parent = None
+
         # Create mch
         mch_bone   = copy_bone(self.obj, hip_org_name, make_mechanism_name(ctrl_name) )
         
@@ -106,38 +129,11 @@ class Rig:
         mch_bone_e = eb[mch_bone]
         mch_bone_e.parent = None
         
-        # Create tweak
-        tweak_bone   = copy_bone(self.obj, hip_org_name, ctrl_name )
-        tweak_bone_e = eb[tweak_bone]
-        
-        ### *** Bug Fix --> Disappearing bone ***
-        tweak_bone_e.parent = None
-        
-        # Calculate the position of the tweak bone's tail,
-        # make it continue on a straight line from the ctrl_bone
-        tweak_bone_e.head[:] = ctrl_bone_e.tail
-        v1    = ctrl_bone_e.tail
-        v2    = ctrl_bone_e.head
-        v_avg = (( v1 + v2 ) / -4)  # 25% of the ctrl_bone's size
-        tweak_bone_e.tail[:] = v_avg
-        
-        ### *** Bug Fix --> Trying to register tweak bone in the pose library... ??? ***
-        #bpy.ops.object.mode_set(mode ='OBJECT')
-        #bpy.ops.object.mode_set(mode ='EDIT')
-        #eb = self.obj.data.edit_bones
-        
-        # Create mch drv
-        mch_drv = copy_bone(self.obj, tweak_bone, make_mechanism_name(ctrl_name) + '_DRV' )
-        
-        ### *** Bug Fix --> Disappearing bone ***
-        mch_drv_bone_e = eb[mch_drv]
-        mch_drv_bone_e.parent = None
-        
         hips_dict = {
             'ctrl'    : ctrl_bone, 
             'mch'     : mch_bone, 
             'tweak'   : tweak_bone, 
-            'mch_drv' : mch_drv 
+            'mch_drv' : mch_drv_bone 
         }
         
         return hips_dict
@@ -465,6 +461,12 @@ class Rig:
         #        bone.parent = None
         ## !!!! Breaks parenting thru the entire rig including it's rig types !!!!
         
+        ## *** Trying a different method of clearing bone parenting.. 'bpy_prop_collection[key]: key "mch_rot_bones" not found'
+        #for bones in all_bones.keys():
+        #    for bone in all_bones[bones]:
+        #        eb[bone].parent = None
+        
+        
         # Parenting the torso and its children
         torso_name = all_bones['torso']['ctrl']
         torso_bone_e = eb[torso_name]
@@ -719,14 +721,14 @@ class Rig:
         subtarget = back_mch_str_name
         factor = 1 / len(back_mch_drv_names)
         
-        for bone in back_mch_drv_names:
-            if back_mch_drv_names.index(bone) != 0 or back_mch_drv_names.index(bone) != len(back_mch_drv_names) - 1:
-                head_tail = back_mch_drv_names.index(bone) * factor
-                influence = 1.0 - head_tail
-                constraint_data[bone].append( { 'constraint' : 'COPY_TRANSFORMS',
-                                                'subtarget'  : subtarget,
-                                                'head_tail'  : head_tail,
-                                                'influence'  : influence          } )
+        for bone in back_mch_drv_names[1:-1]:
+            #if back_mch_drv_names.index(bone) != 0:
+            head_tail = back_mch_drv_names.index(bone) * factor
+            influence = 1.0 - head_tail
+            constraint_data[bone].append( { 'constraint' : 'COPY_TRANSFORMS',
+                                            'subtarget'  : subtarget,
+                                            'head_tail'  : head_tail,
+                                            'influence'  : influence          } )
         
         # extending the last back mch drv transforms
         subtarget = ribs_ctrl_name
@@ -747,16 +749,17 @@ class Rig:
                                                 'subtarget'  : subtarget,
                                                 'influence'  : influence       } )
                 i += 1
-        # each back mch_drv following the next in line
-        inner_mch_drv = mch_drv_bones[1:-1]
-        for bone in inner_mch_drv:
-            if inner_mch_drv.index(bone) == len(inner_mch_drv) - 1:
-                subtarget = head_ctrl_name
-            else:
-                subtarget = mch_drv_bones[mch_drv_bones.index(bone) + 1]
         
-            constraint_data[bone].append( { 'constraint' : 'DAMPED_TRACK',
-                                            'subtarget'  : subtarget       } )
+        ### *** Omitted! --> Seems to create some design problem... ***
+        # each back mch_drv following the next in line
+        #inner_mch_drv = mch_drv_bones[1:-1]
+        #for bone in inner_mch_drv:
+        #    if inner_mch_drv.index(bone) == len(inner_mch_drv) - 1:
+        #        subtarget = head_ctrl_name
+        #    else:
+        #        subtarget = mch_drv_bones[mch_drv_bones.index(bone) + 1]
+        #    constraint_data[bone].append( { 'constraint' : 'DAMPED_TRACK',
+        #                                    'subtarget'  : subtarget       } )
         
         # head mch drv following the head control
         subtarget = head_ctrl_name
