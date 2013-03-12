@@ -93,29 +93,36 @@ class Rig:
         ctrl_bone  = copy_bone(self.obj, hip_org_name, ctrl_name )
         ctrl_bone_e = eb[ctrl_bone]
         
+        ### *** Bug Fix --> Disappearing bone ***
+        ctrl_bone_e.parent = None
+        
         # Flip the hips' direction to create a more natural pivot for rotation
         flip_bone(self.obj, ctrl_name)
         
         # Create mch
         mch_bone   = copy_bone(self.obj, hip_org_name, make_mechanism_name(ctrl_name) )
         
+        ### *** Bug Fix --> Disappearing bone ***
+        mch_bone_e = eb[mch_bone]
+        mch_bone_e.parent = None
+        
         # Create tweak
-        tweak_bone = copy_bone(self.obj, hip_org_name, ctrl_name )
+        tweak_bone   = copy_bone(self.obj, hip_org_name, ctrl_name )
+        tweak_bone_e = eb[tweak_bone]
+        
+        ### *** Bug Fix --> Disappearing bone ***
+        tweak_bone_e.parent = None
         
         # Calculate the position of the tweak bone's tail,
         # make it continue on a straight line from the ctrl_bone
-        tweak_bone_e = eb[tweak_bone]
         tweak_bone_e.head[:] = ctrl_bone_e.tail
         v1    = ctrl_bone_e.tail
         v2    = ctrl_bone_e.head
         v_avg = (( v1 + v2 ) / -4)  # 25% of the ctrl_bone's size
         tweak_bone_e.tail[:] = v_avg
         
-        ### *** Bug Fix --> Disappearing bone ***
-        tweak_bone_e.parent = None
-        
         # Create mch drv
-        mch_drv = copy_bone(self.obj, ctrl_bone, make_mechanism_name(ctrl_name) + '_DRV' )
+        mch_drv = copy_bone(self.obj, ctrl_bone, make_mechanism_name(tweak_bone) + '_DRV' )
         
         ### *** Bug Fix --> Disappearing bone ***
         mch_drv_bone_e = eb[mch_drv]
@@ -190,7 +197,10 @@ class Rig:
         for i in range(2):
             ribs_mch_rotation_name = copy_bone(self.obj, ribs_ctrl_name, ribs_mch_rotation_name )
             mch_rot_bones.append( ribs_mch_rotation_name )
-        
+            
+            ### *** Bug Fix --> Disappearing bone ***
+            eb[ribs_mch_rotation_name].parent = None
+            
         no_of_bones = len(back_org_bones)
         
         # Create mch_drv bone
@@ -200,6 +210,9 @@ class Rig:
             mch_drv_name   = copy_bone( self.obj, spine_mch_stretch_name, mch_drv_name )
             mch_drv_bone_e = eb[mch_drv_name]
             mch_drv_bones.append( mch_drv_name )
+        
+            ### *** Bug Fix --> Disappearing bone ***
+            mch_drv_bone_e.parent = None
         
         self.position_bones( spine_mch_stretch_name, mch_drv_bones, 4 )
         
@@ -267,6 +280,8 @@ class Rig:
         for i in range(2):
             mch_rotation_name = copy_bone(self.obj, ctrl_name, mch_rotation_name )
             mch_rot_bones.append( mch_rotation_name )
+            ### *** Bug Fix --> Disappearing bone ***
+            eb[mch_rotation_name].parent = None
             
         # Create mch stretch bone
         mch_stretch_name = make_mechanism_name( ctrl_name ) + '_stretch'
@@ -346,6 +361,8 @@ class Rig:
         for i in range(2):
             mch_rotation_name = copy_bone(self.obj, ctrl_name, mch_rotation_name )
             mch_rot_bones.append( mch_rotation_name )
+            ### *** Bug Fix --> Disappearing bone ***
+            eb[mch_rotation_name].parent = None
         
         # Create mch drv bone
         mch_drv_name = make_mechanism_name( ctrl_name ) + '_DRV'
