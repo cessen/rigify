@@ -98,20 +98,13 @@ class Rig:
         flip_bone(self.obj, ctrl_name)
 
         # Create mch drv
-        mch_drv_bone = copy_bone(self.obj, hip_org_name, make_mechanism_name(ctrl_name) + '_DRV' )
+        mch_drv_bone = copy_bone(self.obj, ctrl_name, make_mechanism_name(ctrl_name) + '_DRV' )
         mch_drv_bone_e = eb[mch_drv_bone]
 
-        # Calculate the position of the tweak bone's tail,
-        # make it continue on a straight line from the ctrl_bone
-        mch_drv_bone_e.head[:] = hip_org_bone_e.head
-        v1    = hip_org_bone_e.head
-        v2    = hip_org_bone_e.tail
-        v_avg = (( v1 + v2 ) / -4)  # 25% of the ctrl_bone's size
-        mch_drv_bone_e.tail[:] = v_avg
-        
         # Create tweak
-        tweak_bone   = copy_bone(self.obj, mch_drv_bone, ctrl_name )
+        tweak_bone   = copy_bone(self.obj, hip_org_name, ctrl_name )
         tweak_bone_e = eb[tweak_bone]
+        tweak_bone_e.tail[:] = ( tweak_bone_e.head + tweak_bone_e.tail ) / 2
 
         # Create mch
         mch_bone   = copy_bone(self.obj, hip_org_name, make_mechanism_name(ctrl_name) )
@@ -136,11 +129,6 @@ class Rig:
         ribs_org_bones  = sorted([ bone for bone in org_bones if 'ribs' in bone.lower() ], key=str.lower )
         
         back_org_bones = spine_org_bones + ribs_org_bones
-        
-        ## TODO:
-        #  1. add support for misnumbered chain names ( bone --> bone.002 --> bone.003 )
-        #     and use the parenting structure instead
-        # first_spine_bone = [ bone for bone in spine_org_bones if 'hips' in bone.parent.name.lower() ].pop()        
         
         # Create spine ctrl bone
         spine_ctrl_name = strip_org( spine_org_bones[0] )
@@ -381,7 +369,6 @@ class Rig:
         eb = self.obj.data.edit_bones
         
         # Clearing out previous parenting save the org bones
-        
         for category in all_bones.keys():
             for bones in all_bones[category].keys():
                 if isinstance( all_bones[category][bones], list ):
@@ -511,13 +498,6 @@ class Rig:
             else:
                 bone.parent = def_bones_e[ def_bones_e.index(bone) - 1 ]
                 bone.use_connect = True
-        
-        # Parenting the org bones (back again :-( )
-        #for bone in org_bones:
-        #    if org_bones.index(bone) == 0:
-        #        eb[bone].parent = None # Later rigify will parent to root
-        #    else:
-        #        eb[bone].parent = eb[ org_bones[ org_bones.index(bone) - 1 ] ]
         
         ## Parenting the org bones to tweak
         parent_bones = [ hips_tweak_name ] + back_tweak_names + neck_tweak_names + [ head_mch_drv_name ]
@@ -656,10 +636,6 @@ class Rig:
             constraint_data[bone].append( { 'constraint' : 'COPY_TRANSFORMS',
                                             'subtarget'  : subtarget          } )
             
-            if mch_drv_bones.index(bone) == 0:
-                constraint_data[bone][-1]['head_tail'] = 1.0
-        
-        
         ## MCH constraints (4)
         
         subtarget_bones = back_tweak_names + neck_tweak_names + [ head_mch_drv_name ]
@@ -738,7 +714,11 @@ class Rig:
         
         for prop in props_list:
             
-            pb_torso[prop] = 1.0
+            if prop == 'neck_follow':
+                pb_torso[prop] = 0.5
+            else:
+                pb_torso[prop] = 0.0
+
             prop = rna_idprop_ui_prop_get( pb_torso, prop )
             prop["min"] = 0.0
             prop["max"] = 1.0
@@ -866,10 +846,26 @@ def add_parameters(params):
         )
 
     #Setting up extra layers for the FK and tweak
-    params.tweak_extra_layers = bpy.props.BoolProperty(name="", default=False, description="")
-    params.tweak_layers = bpy.props.BoolVectorProperty(size=32, description="Layers for the FK controls to be on")
-    params.fk_extra_layers = bpy.props.BoolProperty(name="", default=False, description="")
-    params.fk_layers = bpy.props.BoolVectorProperty(size=32, description="Layers for the FK controls to be on")
+    params.tweak_extra_layers = bpy.props.BoolProperty( 
+        name        = "tweak_extra_layers", 
+        default     = True, 
+        description = ""
+        )
+    params.tweak_layers = bpy.props.BoolVectorProperty(
+        size        = 32,
+        description = "Layers for the tweak controls to be on",
+        default     = tuple( [ i == 1 for i in range(0, 32) ] )
+        )
+    params.fk_extra_layers = bpy.props.BoolProperty(
+        name        = "fk_extra_layers",
+        default     = True, 
+        description = ""
+        )
+    params.fk_layers = bpy.props.BoolVectorProperty(
+        size        = 32,
+        description = "Layers for the FK controls to be on",
+        default     = tuple( [ i == 2 for i in range(0, 32) ] )
+        )
 
 
 def parameters_ui(layout, params):
@@ -877,92 +873,94 @@ def parameters_ui(layout, params):
     
     r = layout.row()
     r.prop(params, "torso_name")
-    
+        
     r = layout.row()
+    r.prop(params, "tweak_extra_layers")
     r.active = params.tweak_extra_layers
     
     col = r.column(align=True)
     row = col.row(align=True)
-    row.prop(params, "extra_layers", index=0, toggle=True, text="")
-    row.prop(params, "extra_layers", index=1, toggle=True, text="")
-    row.prop(params, "extra_layers", index=2, toggle=True, text="")
-    row.prop(params, "extra_layers", index=3, toggle=True, text="")
-    row.prop(params, "extra_layers", index=4, toggle=True, text="")
-    row.prop(params, "extra_layers", index=5, toggle=True, text="")
-    row.prop(params, "extra_layers", index=6, toggle=True, text="")
-    row.prop(params, "extra_layers", index=7, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=0, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=1, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=2, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=3, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=4, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=5, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=6, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=7, toggle=True, text="")
     row = col.row(align=True)
-    row.prop(params, "extra_layers", index=16, toggle=True, text="")
-    row.prop(params, "extra_layers", index=17, toggle=True, text="")
-    row.prop(params, "extra_layers", index=18, toggle=True, text="")
-    row.prop(params, "extra_layers", index=19, toggle=True, text="")
-    row.prop(params, "extra_layers", index=20, toggle=True, text="")
-    row.prop(params, "extra_layers", index=21, toggle=True, text="")
-    row.prop(params, "extra_layers", index=22, toggle=True, text="")
-    row.prop(params, "extra_layers", index=23, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=16, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=17, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=18, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=19, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=20, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=21, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=22, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=23, toggle=True, text="")
     
     col = r.column(align=True)
     row = col.row(align=True)
-    row.prop(params, "ik_layers", index=8, toggle=True, text="")
-    row.prop(params, "ik_layers", index=9, toggle=True, text="")
-    row.prop(params, "ik_layers", index=10, toggle=True, text="")
-    row.prop(params, "ik_layers", index=11, toggle=True, text="")
-    row.prop(params, "ik_layers", index=12, toggle=True, text="")
-    row.prop(params, "ik_layers", index=13, toggle=True, text="")
-    row.prop(params, "ik_layers", index=14, toggle=True, text="")
-    row.prop(params, "ik_layers", index=15, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=8, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=9, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=10, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=11, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=12, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=13, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=14, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=15, toggle=True, text="")
     row = col.row(align=True)
-    row.prop(params, "ik_layers", index=24, toggle=True, text="")
-    row.prop(params, "ik_layers", index=25, toggle=True, text="")
-    row.prop(params, "ik_layers", index=26, toggle=True, text="")
-    row.prop(params, "ik_layers", index=27, toggle=True, text="")
-    row.prop(params, "ik_layers", index=28, toggle=True, text="")
-    row.prop(params, "ik_layers", index=29, toggle=True, text="")
-    row.prop(params, "ik_layers", index=30, toggle=True, text="")
-    row.prop(params, "ik_layers", index=31, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=24, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=25, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=26, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=27, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=28, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=29, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=30, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=31, toggle=True, text="")
     
     r = layout.row()
+    r.prop(params, "fk_extra_layers")
     r.active = params.fk_extra_layers
     
     col = r.column(align=True)
     row = col.row(align=True)
-    row.prop(params, "extra_layers", index=0, toggle=True, text="")
-    row.prop(params, "extra_layers", index=1, toggle=True, text="")
-    row.prop(params, "extra_layers", index=2, toggle=True, text="")
-    row.prop(params, "extra_layers", index=3, toggle=True, text="")
-    row.prop(params, "extra_layers", index=4, toggle=True, text="")
-    row.prop(params, "extra_layers", index=5, toggle=True, text="")
-    row.prop(params, "extra_layers", index=6, toggle=True, text="")
-    row.prop(params, "extra_layers", index=7, toggle=True, text="")
+    row.prop(params, "fk_layers", index=0, toggle=True, text="")
+    row.prop(params, "fk_layers", index=1, toggle=True, text="")
+    row.prop(params, "fk_layers", index=2, toggle=True, text="")
+    row.prop(params, "fk_layers", index=3, toggle=True, text="")
+    row.prop(params, "fk_layers", index=4, toggle=True, text="")
+    row.prop(params, "fk_layers", index=5, toggle=True, text="")
+    row.prop(params, "fk_layers", index=6, toggle=True, text="")
+    row.prop(params, "fk_layers", index=7, toggle=True, text="")
     row = col.row(align=True)
-    row.prop(params, "extra_layers", index=16, toggle=True, text="")
-    row.prop(params, "extra_layers", index=17, toggle=True, text="")
-    row.prop(params, "extra_layers", index=18, toggle=True, text="")
-    row.prop(params, "extra_layers", index=19, toggle=True, text="")
-    row.prop(params, "extra_layers", index=20, toggle=True, text="")
-    row.prop(params, "extra_layers", index=21, toggle=True, text="")
-    row.prop(params, "extra_layers", index=22, toggle=True, text="")
-    row.prop(params, "extra_layers", index=23, toggle=True, text="")
+    row.prop(params, "fk_layers", index=16, toggle=True, text="")
+    row.prop(params, "fk_layers", index=17, toggle=True, text="")
+    row.prop(params, "fk_layers", index=18, toggle=True, text="")
+    row.prop(params, "fk_layers", index=19, toggle=True, text="")
+    row.prop(params, "fk_layers", index=20, toggle=True, text="")
+    row.prop(params, "fk_layers", index=21, toggle=True, text="")
+    row.prop(params, "fk_layers", index=22, toggle=True, text="")
+    row.prop(params, "fk_layers", index=23, toggle=True, text="")
     
     col = r.column(align=True)
     row = col.row(align=True)
-    row.prop(params, "ik_layers", index=8, toggle=True, text="")
-    row.prop(params, "ik_layers", index=9, toggle=True, text="")
-    row.prop(params, "ik_layers", index=10, toggle=True, text="")
-    row.prop(params, "ik_layers", index=11, toggle=True, text="")
-    row.prop(params, "ik_layers", index=12, toggle=True, text="")
-    row.prop(params, "ik_layers", index=13, toggle=True, text="")
-    row.prop(params, "ik_layers", index=14, toggle=True, text="")
-    row.prop(params, "ik_layers", index=15, toggle=True, text="")
+    row.prop(params, "fk_layers", index=8, toggle=True, text="")
+    row.prop(params, "fk_layers", index=9, toggle=True, text="")
+    row.prop(params, "fk_layers", index=10, toggle=True, text="")
+    row.prop(params, "fk_layers", index=11, toggle=True, text="")
+    row.prop(params, "fk_layers", index=12, toggle=True, text="")
+    row.prop(params, "fk_layers", index=13, toggle=True, text="")
+    row.prop(params, "fk_layers", index=14, toggle=True, text="")
+    row.prop(params, "fk_layers", index=15, toggle=True, text="")
     row = col.row(align=True)
-    row.prop(params, "ik_layers", index=24, toggle=True, text="")
-    row.prop(params, "ik_layers", index=25, toggle=True, text="")
-    row.prop(params, "ik_layers", index=26, toggle=True, text="")
-    row.prop(params, "ik_layers", index=27, toggle=True, text="")
-    row.prop(params, "ik_layers", index=28, toggle=True, text="")
-    row.prop(params, "ik_layers", index=29, toggle=True, text="")
-    row.prop(params, "ik_layers", index=30, toggle=True, text="")
-    row.prop(params, "ik_layers", index=31, toggle=True, text="")
+    row.prop(params, "fk_layers", index=24, toggle=True, text="")
+    row.prop(params, "fk_layers", index=25, toggle=True, text="")
+    row.prop(params, "fk_layers", index=26, toggle=True, text="")
+    row.prop(params, "fk_layers", index=27, toggle=True, text="")
+    row.prop(params, "fk_layers", index=28, toggle=True, text="")
+    row.prop(params, "fk_layers", index=29, toggle=True, text="")
+    row.prop(params, "fk_layers", index=30, toggle=True, text="")
+    row.prop(params, "fk_layers", index=31, toggle=True, text="")
     
     """
     r = layout.row()
