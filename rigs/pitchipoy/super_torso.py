@@ -8,12 +8,31 @@ from rna_prop_ui import rna_idprop_ui_prop_get
 
 script = """
 controls    = [%s]
+head_name   = '%s'
+neck_name   = '%s'
+ribs_name   = '%s'
 pb          = bpy.data.objects['%s'].pose.bones
-master_name = '%s'
+torso_name  = '%s'
 for name in controls:
     if is_selected(name):
-        layout.prop(pb[master_name], '["%s"]', text="Curvature", slider=True)
+        layout.prop(pb[torso_name], '["%s"]', slider=True)
         break
+for name in controls:
+    if is_selected(name):
+        if name == head_name:
+            layout.prop(pb[torso_name], '["%s"]', slider=True)
+            break
+        if name == neck_name:
+            layout.prop(pb[torso_name], '["%s"]', slider=True)
+            break
+        if name == ribs_name:
+            layout.prop(pb[torso_name], '["%s"]', slider=True)
+            break
+        if name == torso_name:
+            layout.prop(pb[torso_name], '["%s"]', slider=True)
+            layout.prop(pb[torso_name], '["%s"]', slider=True)
+            layout.prop(pb[torso_name], '["%s"]', slider=True)
+            break
 """
 class Rig:
     
@@ -36,31 +55,6 @@ class Rig:
             raise MetarigError("RIGIFY ERROR: Bone '%s': listen bro, that torso rig jusaint put tugetha rite. A little hint, use at least five bones!!" % (strip_org(bone_name)))            
 
 
-    def create_torso( self ):
-        """ Create the torso control bone """
-
-        org_bones = self.org_bones
-
-        bpy.ops.object.mode_set(mode ='EDIT')
-        eb = self.obj.data.edit_bones
-            
-        org_name  = self.org_bones[0]
-        
-        torso_name = self.params.torso_name
-        ctrl_bone = copy_bone(self.obj, org_name, torso_name)
-        ctrl_bone_e = eb[ctrl_bone]
-        
-        v1    = ctrl_bone_e.head
-        v2    = ctrl_bone_e.tail
-        v_avg = ( v1 + v2 ) / 2
-        ctrl_bone_e.head[:] = v_avg
-        
-        tail_vec = Vector((0, 0.25, 0)) * self.obj.matrix_world
-        ctrl_bone_e.tail[:] = ctrl_bone_e.head + tail_vec
-        
-        return { 'ctrl' : ctrl_bone }
-
-
     def position_bones( self, anchor, bones, size = 1 ):
 
         bpy.ops.object.mode_set(mode ='EDIT')
@@ -78,6 +72,31 @@ class Rig:
             bone_e.roll    = anchor_e.roll
 
 
+    def create_torso( self ):
+        """ Create the torso control bone """
+
+        org_bones = self.org_bones
+
+        bpy.ops.object.mode_set(mode ='EDIT')
+        eb = self.obj.data.edit_bones
+            
+        org_name  = self.org_bones[0]
+        
+        torso_name  = self.params.torso_name
+        ctrl_bone   = copy_bone(self.obj, org_name, torso_name)
+        ctrl_bone_e = eb[ctrl_bone]
+        
+        v1    = ctrl_bone_e.head
+        v2    = ctrl_bone_e.tail
+        v_avg = ( v1 + v2 ) / 2
+        ctrl_bone_e.head[:] = v_avg
+        
+        tail_vec = Vector((0, 0.25, 0)) * self.obj.matrix_world
+        ctrl_bone_e.tail[:] = ctrl_bone_e.head + tail_vec
+        
+        return { 'ctrl' : ctrl_bone }
+
+
     def create_hips( self ):
         """ Create the hip bones """
         
@@ -91,7 +110,7 @@ class Rig:
         ctrl_name      = strip_org(hip_org_name)
         
         # Create ctrl
-        ctrl_bone  = copy_bone(self.obj, hip_org_name, ctrl_name )
+        ctrl_bone   = copy_bone(self.obj, hip_org_name, ctrl_name )
         ctrl_bone_e = eb[ctrl_bone]
         
         # Flip the hips' direction to create a more natural pivot for rotation
@@ -107,7 +126,7 @@ class Rig:
         tweak_bone_e.tail[:] = ( tweak_bone_e.head + tweak_bone_e.tail ) / 2
 
         # Create mch
-        mch_bone   = copy_bone(self.obj, hip_org_name, make_mechanism_name(ctrl_name) )
+        mch_bone = copy_bone(self.obj, hip_org_name, make_mechanism_name(ctrl_name) )
         
         hips_dict = {
             'ctrl'    : ctrl_bone, 
@@ -175,19 +194,19 @@ class Rig:
         mch_bones   = []
         for org in back_org_bones:
             # Create tweak bones
-            tweak_name = strip_org(org)
-            tweak_name = copy_bone(self.obj, org, tweak_name )
-            tweak_bone_e = eb[tweak_name]
-            tweak_bone_e.tail = tweak_bone_e.head + ( tweak_bone_e.tail - tweak_bone_e.head ) / 2
+            tweak_name          = strip_org(org)
+            tweak_name          = copy_bone(self.obj, org, tweak_name )
+            tweak_bone_e        = eb[tweak_name]
+            tweak_bone_e.tail   = tweak_bone_e.head + ( tweak_bone_e.tail - tweak_bone_e.head ) / 2
             tweak_bone_e.parent = None 
             
             tweak_bones.append( tweak_name )
             
             # Create mch bones
-            mch_name = make_mechanism_name( strip_org(org) )
-            mch_bone = copy_bone(self.obj, org, mch_name )
-            mch_bone_e = eb[mch_name]
-             
+            mch_name          = make_mechanism_name( strip_org(org) )
+            mch_bone          = copy_bone(self.obj, org, mch_name )
+            mch_bone_e        = eb[mch_bone]
+            mch_bone_e.parent = None
             mch_bones.append( mch_name )
         
         back_dict = {
@@ -247,6 +266,7 @@ class Rig:
             tweak_bone_e.tail = tweak_bone_e.head + ( tweak_bone_e.tail - tweak_bone_e.head ) / 2
             
             tweak_bones.append( tweak_name )
+            
             # Create mch bones
             mch_name = make_mechanism_name( ctrl_name )
             mch_name = copy_bone( self.obj, org, mch_name )
@@ -323,6 +343,7 @@ class Rig:
         self.position_bones( anchor_neck, neck_fk_bones )
         
         return { 'fk_bones' : fk_bones }
+
         
     def create_deformation( self ):
         org_bones = self.org_bones
@@ -340,14 +361,22 @@ class Rig:
 
 
     def create_bones(self):
+        org_bones = self.org_bones
+        bpy.ops.object.mode_set(mode ='EDIT')
+        eb = self.obj.data.edit_bones
+
+        # Clear parents for org bones
+        for bone in org_bones:
+            eb[bone].use_connect = False
+            eb[bone].parent      = None
         
         torso       = self.create_torso()
         hips        = self.create_hips()
         back        = self.create_back()
         neck        = self.create_neck()
         head        = self.create_head()
-        fk          = self.create_fk( back['mch_stretch'], neck['mch_stretch'])
         deformation = self.create_deformation()
+        fk          = self.create_fk( back['mch_stretch'], neck['mch_stretch'])
         
         all_bones = {
             'torso' : torso,
@@ -377,6 +406,7 @@ class Rig:
                 else:
                     eb[ all_bones[category][bones] ].parent = None
         
+    
         # Parenting the torso and its children
         torso_name = all_bones['torso']['ctrl']
         torso_bone_e = eb[torso_name]
@@ -503,8 +533,9 @@ class Rig:
         parent_bones = [ hips_tweak_name ] + back_tweak_names + neck_tweak_names + [ head_mch_drv_name ]
         
         for bone, parent in zip( org_bones, parent_bones ):
-            eb[bone].parent = eb[parent]
-        
+            eb[bone].use_connect = False
+            eb[bone].parent      = eb[parent]
+            
 
     def constraints_data( self, all_bones ):
         ## Big mama: the dictionary that contains all the information about the constraints
@@ -557,7 +588,6 @@ class Rig:
         fk_bones = all_bones['fk']['fk_bones']
         
         ### Build contraint data dictionary
-        
         ## MCH Rotation constraints (1)
         subtarget_ctrl_bones    = [ spine_ctrl_name, ribs_ctrl_name, neck_ctrl_name ] 
         subtarget_mch_rot_bones = [ ribs_mch_rot_names[1], neck_mch_rot_names[1], head_mch_rot_names[1] ]
@@ -588,7 +618,6 @@ class Rig:
                 constraint_data[bone][1]['head_tail'] = 1.0
         
         ## MCH DRV constraints (3)
-        
         # Initializing constraints data stack
         for bone in mch_drv_bones:
             constraint_data[bone] = [ ]
@@ -637,7 +666,6 @@ class Rig:
                                             'subtarget'  : subtarget          } )
             
         ## MCH constraints (4)
-        
         subtarget_bones = back_tweak_names + neck_tweak_names + [ head_mch_drv_name ]
         
         for bone, subtarget in zip( mch_bones, subtarget_bones ):
@@ -822,6 +850,9 @@ class Rig:
             if self.fk_layers:
                 pb[bone].bone.layers = self.fk_layers
 
+        all_controls = [ torso_name ] + control_names + tweak_names + fk_names
+
+        return all_controls
 
     def generate(self):
         
@@ -831,8 +862,30 @@ class Rig:
         self.set_constraints( constraint_data )
         self.drivers_and_props( all_bones )
         self.bone_properties( all_bones )
-        self.assign_widgets( all_bones )
+        all_controls = self.assign_widgets( all_bones )
 
+        torso_name      = all_bones['torso']['ctrl']
+        ribs_ctrl_name  = all_bones['back']['ribs_ctrl']
+        neck_ctrl_name  = all_bones['neck']['ctrl']
+        head_ctrl_name  = all_bones['head']['ctrl']
+
+        # Create UI
+        controls_string = ", ".join(["'" + x + "'" for x in all_controls])
+        return [script % (
+            controls_string, 
+            head_ctrl_name, 
+            neck_ctrl_name, 
+            ribs_ctrl_name, 
+            self.obj.name, 
+            torso_name, 
+            'IK/FK',        # All controls display this prop
+            'head_follow',  # Only head (and torso) displays this prop
+            'neck_follow',  # Only neck (and torso) displays this prop
+            'ribs_follow',  # Only ribs (and torso) displays this prop
+            'head_follow',  #
+            'neck_follow',  # These three also appear on torso
+            'ribs_follow'   #
+            )]
 
 def add_parameters(params):
     """ Add the parameters of this rig type to the
