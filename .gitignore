@@ -36,3 +36,7 @@ nosetests.xml
 
 # Ignore files
 rigs/pitchipoy/super_torso.py~
+rigs/pitchipoy/copy_script.sh
+rigs/pitchipoy/copy_script.sh~
+rigs/pitchipoy/super_face.py~
+
