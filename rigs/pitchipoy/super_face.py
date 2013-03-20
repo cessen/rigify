@@ -284,7 +284,7 @@ class Rig:
         
         return { 'ctrls' : ctrls, 'tweaks' : tweaks }, tweak_unique
 
-    def create_mch( self, jaw_ctrl ):
+    def create_mch( self, jaw_ctrl, tongue_ctrl ):
         org_bones = self.org_bones
         bpy.ops.object.mode_set(mode ='EDIT')
         eb = self.obj.data.edit_bones
@@ -362,6 +362,20 @@ class Rig:
             eb[ mch_name ].length = eb[ jaw_ctrl ].length - length_subtractor * i
 
             mch_bones['jaw'].append( mch_name )
+
+        # Tongue mch bones
+        
+        mch_bones['tongue'] = []
+        
+        # create mch bones for all tongue org_bones except the first one
+        for bone in sorted([ org for org in org_bones if 'tongue' in org ])[1:]:
+            mch_name = make_mechanism_name( strip_org( bone ) )
+            mch_name = copy_bone( self.obj, tongue_ctrl, mch_name )
+
+            eb[ mch_name ].use_connect = False
+            eb[ mch_name ].parent      = None
+            
+            mch_bones['tongue'].append( mch_name )
         
         return mch_bones
         
@@ -414,13 +428,20 @@ class Rig:
         ear_defs  = [ 'DEF-ear.L', 'DEF-ear.L.001', 'DEF-ear.R', 'DEF-ear.R.001' ]
         ear_ctrls = [ 'ear.L', 'ear.R' ]
         
-        eb[ 'DEF-jaw' ].parent = eb[ 'jaw' ]
+        eb[ 'DEF-jaw' ].parent = eb[ 'jaw' ] # Parent jaw def bone to jaw tweak
 
         for ear_ctrl in ear_ctrls:
             for ear_def in ear_defs:
                 if ear_ctrl in ear_def:
                     eb[ ear_def ].parent = eb[ ear_ctrl ]
-
+        
+        ## Parenting all mch bones
+        
+        eb[ 'MCH-eyes_parent' ].parent = None  # eyes_parent will be parented to root
+        
+        # parent all mch tongue bones to the jaw master control bone
+        for bone in all_bones['mch']['tongue']:
+            eb[ bone ].parent = eb[ all_bones['ctrls']['jaw'][0] ]
 
     def create_bones(self):
         org_bones = self.org_bones
@@ -436,7 +457,10 @@ class Rig:
         
         def_names           = self.create_deformation()
         ctrls, tweak_unique = self.all_controls()
-        mchs                = self.create_mch( ctrls['ctrls']['jaw'][0] )
+        mchs                = self.create_mch( 
+                                    ctrls['ctrls']['jaw'][0], 
+                                    ctrls['ctrls']['tongue'][0] 
+                                    )
 
         return { 
             'deform' : def_names, 
