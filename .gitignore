@@ -34,6 +34,9 @@ nosetests.xml
 .project
 .pydevproject
 
+# Temp files
+*.py~
+
 # Ignore files
 rigs/pitchipoy/super_torso.py~
 rigs/pitchipoy/copy_script.sh

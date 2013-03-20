@@ -92,8 +92,13 @@ class Rig:
         master_name      = temp_name + "_master"
         master_name      = copy_bone( self.obj, org_name, master_name )
         ctrl_bone_master = eb[ master_name ]
-
+        
+        ## Parenting bug fix ??
+        ctrl_bone_master.use_connect = False
+        ctrl_bone_master.parent      = None
+        
         ctrl_bone_master.tail += ( eb[ org_bones[-1] ].tail - eb[org_name].head ) * 1.25
+        
         
         # Creating the bone chains
         for i in range(len(self.org_bones)):
@@ -129,11 +134,18 @@ class Rig:
         #    if b not in self.org_bones:
         #        b.parent = None
         
-        all_bones = org_bones + ctrl_chain + def_chain + mch_chain + mch_drv_chain + [ master_name ]
-        # Clear parents for org bones
+        all_bones = org_bones[1:] + ctrl_chain + def_chain + mch_chain + mch_drv_chain + [ master_name ]
+        # Clear parents for all bones no first org.. (??)
         for bone in all_bones:
             eb[bone].use_connect = False
             eb[bone].parent      = None
+        
+        # Restoring org chain parenting
+        for bone in org_bones[1:]:
+            eb[bone].parent = eb[ org_bones.index(bone) ]
+        
+        # Parenting the master bone to the first org
+        ctrl_bone_master.parent = eb[ org_bones[0] ]
         
         # Parenting chain bones
         for i in range(len(self.org_bones)):
@@ -158,20 +170,14 @@ class Rig:
                 mch_bone_drv_e.use_connect  = False
             else:
                 # The rest
-                print (ctrl_bone_e.parent)
                 ctrl_bone_e.parent         = mch_bone_drv_e
                 ctrl_bone_e.use_connect    = False 
-                print (ctrl_bone_e.parent)
                 
-                print (def_bone_e.parent)
                 def_bone_e.parent          = eb[def_chain[i-1]]
                 def_bone_e.use_connect     = True
-                print (def_bone_e.parent)
                 
-                print (mch_bone_drv_e.parent)
                 mch_bone_drv_e.parent      = eb[ctrl_chain[i-1]]
                 mch_bone_drv_e.use_connect = False
-                print (mch_bone_drv_e.parent)
 
                 # Parenting mch bone
                 mch_bone_e.parent      = ctrl_bone_e
@@ -210,9 +216,9 @@ class Rig:
         for org, ctrl, deform, mch, mch_drv in zip(self.org_bones, ctrl_chain, def_chain, mch_chain, mch_drv_chain):
             
             # Constraining the org bones
-            con           = pb[org].constraints.new('COPY_TRANSFORMS')
-            con.target    = self.obj
-            con.subtarget = ctrl
+            #con           = pb[org].constraints.new('COPY_TRANSFORMS')
+            #con.target    = self.obj
+            #con.subtarget = ctrl
 
             # Constraining the deform bones
             con           = pb[deform].constraints.new('COPY_TRANSFORMS')
