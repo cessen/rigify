@@ -511,8 +511,110 @@ class Rig:
         eb[ 'tongue.001' ].parent = eb[ 'MCH-tongue.001' ]
         eb[ 'tongue.002' ].parent = eb[ 'MCH-tongue.002' ]
         
+    def make_constraits( self, bone_type, bone, target ):
+        print( bone, " : ", target )
+    
+    def constraints_and_drivers( self, all_bones ):
+        org_bones = self.org_bones
+        bpy.ops.object.mode_set(mode ='EDIT')
+        eb = self.obj.data.edit_bones
         
+        ## Def bone constraints
         
+        pattern = r'^DEF-(\w+\.?\w?\.?\w?)(\.?)(\d*?)(\d?)$'
+        
+        def_specials = {
+            # 'bone'             : 'target'
+            'DEF-jaw'               : 'chin',
+            'DEF-chin.L'            : 'lips.L',
+            'DEF-jaw.L.001'         : 'chin.L',
+            'DEF-chin.R'            : 'lips.R',
+            'DEF-jaw.R.001'         : 'chin.R',
+            'DEF-brow.T.L.003'      : 'nose',
+            'DEF-ear.L.003'         : 'ear.L',
+            'DEF-lip.B.L.001'       : 'lips.L',
+            'DEF-lip.B.R.001'       : 'lips.R',
+            'DEF-cheek.B.L.001'     : 'brow.T.L',
+            'DEF-cheek.B.R.001'     : 'brow.T.R',
+            'DEF-lip.T.L.001'       : 'lips.L',
+            'DEF-lip.T.R.001'       : 'lips.R',
+            'DEF-cheek.T.L.001'     : 'nose.L',
+            'DEF-nose.L.001'        : 'nose.002',
+            'DEF-cheek.T.R.001'     : 'nose.R',
+            'DEF-nose.R.001'        : 'nose.002',
+            'DEF-forehead.L'        : 'brow.T.L.001',
+            'DEF-forehead.L.001'    : 'brow.T.L.002',
+            'DEF-forehead.L.002'    : 'brow.T.L.003',
+            'DEF-temple.L'          : 'jaw.L',
+            'DEF-brow.T.R.003'      : 'nose',
+            'DEF-ear.R.003'         : 'ear.R',
+            'DEF-forehead.R'        : 'brow.T.R.001',
+            'DEF-forehead.R.001'    : 'brow.T.R.002',
+            'DEF-forehead.R.002'    : 'brow.T.R.003',
+            'DEF-temple.R'          : 'jaw.R'
+       }
+
+        """
+        'DEF-chin.001'          : 'chin.002',
+        'DEF-chin'              : 'chin.001',
+        'DEF-tongue'            : 'tongue.001',
+        'DEF-tongue.001'        : 'tongue.002',
+        'DEF-tongue.002'        : 'tongue.003',
+        'DEF-jaw.L'             : 'jaw.L.001',
+        'DEF-cheek.T.L'         : 'cheek.T.L.001',
+        'DEF-brow.T.L'          : 'brow.T.L.001',
+        'DEF-brow.T.L.001'      : 'brow.T.L.002',
+        'DEF-brow.T.L.002'      : 'brow.T.L.003',
+        'DEF-nose'              : 'nose.001',
+        'DEF-brow.B.L.003'      : 'brow.B.L.004',
+        'DEF-brow.B.L.002'      : 'brow.B.L.003',
+        'DEF-brow.B.L.001'      : 'brow.B.L.002',
+        'DEF-brow.B.L'          : 'brow.B.L.001',
+        'DEF-nose.L'            : 'nose.L.001',
+        'DEF-ear.L.001'         : 'ear.L.002',
+        'DEF-ear.L.002'         : 'ear.L.003',
+        'DEF-lip.B.L'           : 'lip.B.L.001',
+        'DEF-lip.B.R'           : 'lip.B.R.001',
+        'DEF-cheek.B.L'         : 'cheek.B.L.001',
+        'DEF-cheek.B.R'         : 'cheek.B.R.001',
+        'DEF-lip.T.L'           : 'lip.T.L.001',
+        'DEF-lip.T.R'           : 'lip.T.R.001',
+        'DEF-nose.001'          : 'nose.002',
+        'DEF-nose.002'          : 'nose.003',
+        'DEF-nose.003'          : 'nose.004',
+        'DEF-nose.004'          : 'nose.005',
+        'DEF-jaw.R'             : 'jaw.R.001',
+        'DEF-cheek.T.R'         : 'cheek.T.R.001',
+        'DEF-brow.T.R'          : 'brow.T.R.001',
+        'DEF-brow.T.R.001'      : 'brow.T.R.002',
+        'DEF-brow.T.R.002'      : 'brow.T.R.003',
+        'DEF-brow.B.R.003'      : 'brow.B.R.004',
+        'DEF-brow.B.R.002'      : 'brow.B.R.003',
+        'DEF-brow.B.R.001'      : 'brow.B.R.002',
+        'DEF-brow.B.R'          : 'brow.B.R.001',
+        'DEF-nose.R'            : 'nose.R.001',
+        'DEF-ear.R.001'         : 'ear.R.002',
+        'DEF-ear.R.002'         : 'ear.R.003', """
+        
+        for bone in [ bone for bone in all_bones['deform']['all'] if 'lid' not in bone ]:
+            if bone in list( def_specials.keys() ):
+                self.make_constraits('def_spec', bone, def_specials[bone] )
+            else:
+                matches = re.match( pattern, bone ).groups()
+                if len( matches ) > 1 and matches[-1]:
+                    num = int( matches[-1] ) + 1
+                    str_list = list( matches )[:-1] + [ str( num ) ]
+                    tweak = "".join( str_list )
+                else:
+                    tweak = "".join( matches ) + ".001"
+                self.make_constraits('def_def', bone, tweak )
+                
+        for bone in all_bones['deform']['all']:
+            if 'lid' in bone:
+                mch = make_mechanism_name( bone )
+                self.make_constraits('def_lids', bone, mch )
+
+
 
     def create_bones(self):
         org_bones = self.org_bones
@@ -544,3 +646,4 @@ class Rig:
         
         all_bones, tweak_unique = self.create_bones()
         self.parent_bones( all_bones, tweak_unique )
+        self.constraints_and_drivers( all_bones )
