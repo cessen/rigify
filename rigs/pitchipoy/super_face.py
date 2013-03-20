@@ -455,6 +455,63 @@ class Rig:
         eyes = [ bone for bone in all_bones['ctrls']['eyes'] if 'eyes' not in bone ]
         for eye in eyes:
             eb[ eye ].parent = eb[ 'eyes' ]
+
+        ## Parenting the tweak bones
+
+        # Jaw children (values) groups and their parents (keys)
+        groups = {
+            'jaw_master'    : [
+                'teeth.B',
+                'jaw.001',
+                'jaw.R.001',
+                'jaw.L.001',
+                'chin.L',
+                'chin.R',
+                'chin',
+                'tongue_tweak.003'
+                ],
+            'MCH-jaw'       : [
+                 'lip.B'
+                ],
+            'MCH-jaw.001'   : [
+                'lip_bottom.L',
+                'lip_bottom.R'
+                ],
+            'MCH-jaw.002'   : [
+                'mouth.L',
+                'cheek_bottom.L',
+                'mouth.R',
+                'cheek_bottom.R'
+                ],
+            'MCH-jaw.003'   : [
+                'lip_top',
+                'lip_top.L',
+                'lip_top.R'
+                ],
+            'MCH-jaw.004'   : [
+                'cheek_top.L',
+                'nose.L.001',
+                'nose.002',
+                'nose.004',
+                'cheek_top.R',
+                'nose.R.001'
+                ]
+             }    
+            
+        for parent in list( groups.keys() ):
+            for bone in groups[parent]:
+                eb[ bone ].parent = eb[ parent ]
+        
+        # Remaining arbitrary relatioships for tweak bone parenting
+        eb[ 'chin.001'   ].parent = eb[ 'chin'           ]
+        eb[ 'chin.002'   ].parent = eb[ 'lip.B'          ]
+        eb[ 'nose.001'   ].parent = eb[ 'nose.002'       ]
+        eb[ 'nose.003'   ].parent = eb[ 'nose.002'       ]
+        eb[ 'nose.005'   ].parent = eb[ 'lip.T'          ]
+        eb[ 'tongue'     ].parent = eb[ 'tongue_master'  ]
+        eb[ 'tongue.001' ].parent = eb[ 'MCH-tongue.001' ]
+        eb[ 'tongue.002' ].parent = eb[ 'MCH-tongue.002' ]
+        
         
 
     def create_bones(self):
@@ -476,12 +533,23 @@ class Rig:
                                     ctrls['ctrls']['tongue'][0] 
                                     )
 
-        return { 
+        return {         jaw_children = [ 
+            'teeth.B',
+            'jaw.001',
+            'jaw.R.001',
+            'jaw.L.001',
+            'chin.L',
+
             'deform' : def_names, 
             'ctrls'  : ctrls['ctrls'], 
             'tweaks' : ctrls['tweaks'], 
             'mch'    : mchs 
             }, tweak_unique
+            
+            tongue
+
+
+            
 
     def generate(self):
         
