@@ -136,7 +136,7 @@ class Rig:
         earR_ctrl_name = copy_bone( self.obj, org( bones['ears'][1] ), earR_name )
 
         # jaw ctrl
-        jaw_ctrl_name = strip_org( bones['jaw'][2] )
+        jaw_ctrl_name = strip_org( bones['jaw'][2] ) + '_master'
         jaw_ctrl_name = copy_bone( self.obj, bones['jaw'][2], jaw_ctrl_name )
 
         jawL_org_e = eb[ bones['jaw'][0] ]
@@ -154,9 +154,10 @@ class Rig:
         
         # tongue ctrl
         tongue_org  = bones['tongue'].pop()
-        tongue_name = strip_org( tongue_org )
+        tongue_name = strip_org( tongue_org ) + '_ik'
         
         tongue_ctrl_name = copy_bone( self.obj, tongue_org, tongue_name )
+        print( "tongue control name: ", tongue_ctrl_name )
         
         flip_bone( self.obj, tongue_ctrl_name )
         
@@ -209,8 +210,6 @@ class Rig:
             # pick name for unique bone from the uniques dictionary
             if bone in list( uniques.keys() ):
                 tweak_name = uniques[bone]
-
-            
 
             tweak_name = copy_bone( self.obj, bone, tweak_name )
             eb[ tweak_name ].use_connect = False
@@ -273,7 +272,8 @@ class Rig:
         tweak_exceptions += org_to_ctrls['teeth']
         
         tweak_exceptions.pop( tweak_exceptions.index('tongue') )
-
+        tweak_exceptions.pop( tweak_exceptions.index('jaw')    )
+        
         tweak_exceptions = [ org( bone ) for bone in tweak_exceptions ]
         tweak_tail       = [ org( bone ) for bone in tweak_tail       ]
 
@@ -282,7 +282,7 @@ class Rig:
         ctrls  = self.create_ctrl( org_to_ctrls )
         tweaks = self.create_tweak( org_to_tweak, tweak_unique, tweak_tail )
         
-        return { 'ctrls' : ctrls, 'tweaks' : tweaks }
+        return { 'ctrls' : ctrls, 'tweaks' : tweaks }, tweak_unique
 
     def create_mch( self, jaw_ctrl ):
         org_bones = self.org_bones
@@ -365,29 +365,63 @@ class Rig:
         
         return mch_bones
         
-    def parent_bones( self, all_bones ):
+    def parent_bones( self, all_bones, tweak_unique ):
         org_bones = self.org_bones
         bpy.ops.object.mode_set(mode ='EDIT')
         eb = self.obj.data.edit_bones
         
         face_name = [ bone for bone in org_bones if 'face' in bone ].pop()
         
-        print( all_bones )
-        
         # Initially parenting all bones to the face org bone.
         for category in list( all_bones.keys() ):
+            print( category )
             for area in list( all_bones[category] ):
+                print( "\t", area )
                 for bone in all_bones[category][area]:
-                    print( bone )
+                    print( "\t\t", bone )
                     eb[ bone ].parent = eb[ face_name ]
+        
+        ## Parenting all deformation bones
         
         # Parent all the deformation bones that have respective tweaks
         def_tweaks = [ bone for bone in all_bones['deform']['all'] if bone[4:] in all_bones['tweaks']['all'] ]
 
         for bone in def_tweaks:
+            # the def bone is parented to its corresponding tweak, 
+            # whose name is the same as that of the def bone, without the "DEF-" (first 4 chars)
             eb[ bone ].parent = eb[ bone[4:] ]
+
+        for lip_tweak in list( tweak_unique.values() ):
+            # find the def bones that match unique lip_tweaks by slicing [4:-2]
+            # example: 'lip.B' matches 'DEF-lip.B.R' and 'DEF-lip.B.L' if
+            # you cut off the "DEF-" [4:] and the ".L" or ".R" [:-2]
+            lip_defs = [ bone for bone in all_bones['deform']['all'] if bone[4:-2] == lip_tweak ]
+                        
+            for bone in lip_defs:
+                eb[bone].parent = eb[ lip_tweak ]
+  
+        # parent cheek bones top respetive tweaks
+        lips  = [ 'lips.L',   'lips.R'   ]
+        brows = [ 'brow.T.L', 'brow.T.R' ]
+        cheekB_defs = [ 'DEF-cheek.B.L', 'DEF-cheek.B.R' ]
+        cheekT_defs = [ 'DEF-cheek.T.L', 'DEF-cheek.T.R' ]
         
+        for lip, brow, cheekB, cheekT in zip( lips, brows, cheekB_defs, cheekT_defs ):
+            eb[ cheekB ].parent = eb[ lip ]
+            eb[ cheekT ].parent = eb[ brow ]
         
+        # parent ear deform bones to their controls
+        ear_defs  = [ 'DEF-ear.L', 'DEF-ear.L.001', 'DEF-ear.R', 'DEF-ear.R.001' ]
+        ear_ctrls = [ 'ear.L', 'ear.R' ]
+        
+        eb[ 'DEF-jaw' ].parent = eb[ 'jaw' ]
+
+        for ear_ctrl in ear_ctrls:
+            for ear_def in ear_defs:
+                if ear_ctrl in ear_def:
+                    eb[ ear_def ].parent = eb[ ear_ctrl ]
+
+
     def create_bones(self):
         org_bones = self.org_bones
         bpy.ops.object.mode_set(mode ='EDIT')
@@ -400,13 +434,18 @@ class Rig:
 
         all_bones = {}
         
-        def_names = self.create_deformation()
-        ctrls     = self.all_controls()
-        mchs      = self.create_mch( ctrls['ctrls']['jaw'][0] )
+        def_names           = self.create_deformation()
+        ctrls, tweak_unique = self.all_controls()
+        mchs                = self.create_mch( ctrls['ctrls']['jaw'][0] )
 
-        return { 'deform' : def_names, 'ctrls' : ctrls['ctrls'], 'tweaks' : ctrls['tweaks'], 'mch': mchs }
+        return { 
+            'deform' : def_names, 
+            'ctrls'  : ctrls['ctrls'], 
+            'tweaks' : ctrls['tweaks'], 
+            'mch'    : mchs 
+            }, tweak_unique
 
     def generate(self):
         
-        all_bones = self.create_bones()
-        self.parent_bones( all_bones )
+        all_bones, tweak_unique = self.create_bones()
+        self.parent_bones( all_bones, tweak_unique )
