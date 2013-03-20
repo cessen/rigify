@@ -154,7 +154,7 @@ class Rig:
         
         # tongue ctrl
         tongue_org  = bones['tongue'].pop()
-        tongue_name = strip_org( tongue_org ) + '_ik'
+        tongue_name = strip_org( tongue_org ) + '_master'
         
         tongue_ctrl_name = copy_bone( self.obj, tongue_org, tongue_name )
         print( "tongue control name: ", tongue_ctrl_name )
@@ -442,6 +442,20 @@ class Rig:
         # parent all mch tongue bones to the jaw master control bone
         for bone in all_bones['mch']['tongue']:
             eb[ bone ].parent = eb[ all_bones['ctrls']['jaw'][0] ]
+
+        ## Parenting the control bones
+        
+        # parent teeth.B and tongue master controls to the jaw master control bone
+        for bone in [ 'teeth.B', 'tongue_master' ]:
+            eb[ bone ].parent = eb[ all_bones['ctrls']['jaw'][0] ]
+
+        # eyes
+        eb[ 'eyes' ].parent = eb[ 'MCH-eyes_parent' ]
+        
+        eyes = [ bone for bone in all_bones['ctrls']['eyes'] if 'eyes' not in bone ]
+        for eye in eyes:
+            eb[ eye ].parent = eb[ 'eyes' ]
+        
 
     def create_bones(self):
         org_bones = self.org_bones
