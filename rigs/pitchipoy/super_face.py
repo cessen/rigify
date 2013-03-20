@@ -510,19 +510,19 @@ class Rig:
         eb[ 'tongue'     ].parent = eb[ 'tongue_master'  ]
         eb[ 'tongue.001' ].parent = eb[ 'MCH-tongue.001' ]
         eb[ 'tongue.002' ].parent = eb[ 'MCH-tongue.002' ]
+
         
-    def make_constraits( self, bone_type, bone, target ):
-        print( bone, " : ", target )
+    def make_constraits( self, bone_type, bone, target, influnce = 1 ):
+        org_bones = self.org_bones
+        bpy.ops.object.mode_set(mode ='OBJECT')
+        pb = self.obj.pose.bones
+
+        print( bone, " : ", target, " : ", influence )
+
     
     def constraints_and_drivers( self, all_bones ):
-        org_bones = self.org_bones
-        bpy.ops.object.mode_set(mode ='EDIT')
-        eb = self.obj.data.edit_bones
-        
         ## Def bone constraints
-        
-        pattern = r'^DEF-(\w+\.?\w?\.?\w?)(\.?)(\d*?)(\d?)$'
-        
+      
         def_specials = {
             # 'bone'             : 'target'
             'DEF-jaw'               : 'chin',
@@ -552,7 +552,9 @@ class Rig:
             'DEF-forehead.R.001'    : 'brow.T.R.002',
             'DEF-forehead.R.002'    : 'brow.T.R.003',
             'DEF-temple.R'          : 'jaw.R'
-       }
+        }
+
+        pattern = r'^DEF-(\w+\.?\w?\.?\w?)(\.?)(\d*?)(\d?)$'
 
         for bone in [ bone for bone in all_bones['deform']['all'] if 'lid' not in bone ]:
             if bone in list( def_specials.keys() ):
@@ -572,7 +574,40 @@ class Rig:
                 mch = make_mechanism_name( bone )
                 self.make_constraits('def_lids', bone, mch )
 
-
+        ## MCH constraints
+        
+        # mch lids constraints
+        for bone in all_bones['mch']['lids']:
+            tweak = bone[4:]  # remove "MCH-" from bone name
+            self.make_constraits('mch_lids', bone, tweak )
+        
+        # mch eyes constraints
+        for bone in [ 'MCH-eye.L', 'MCH-eye.R' ]
+            ctrl = bone[4:]  # remove "MCH-" from bone name
+            self.make_constraits('mch_eyes_follow', bone, ctrl )
+        
+        for bone in [ 'MCH-eye.L.001', 'MCH-eye.R.001' ]
+            target = bone[:-4] # remove number from the end of the name
+            self.make_constraits('mch_eyes_lids_follow', bone, target )
+            
+        # mch eyes parent constraints
+        self.make_constraits('mch_eyes_parent', 'MCH-eyes_parent', 'ORG-face' )
+        
+        ## Jaw constraints
+        
+        # jaw master mch bones
+        self.make_constraits( 'mch_jaw_master', 'MCH-mouth_lock',     'jaw_master', 0.20  )
+        self.make_constraits( 'mch_jaw_master', 'MCH-jaw_master',     'jaw_master', 1.00  )
+        self.make_constraits( 'mch_jaw_master', 'MCH-jaw_master.001', 'jaw_master', 0.75  )
+        self.make_constraits( 'mch_jaw_master', 'MCH-jaw_master.002', 'jaw_master', 0.35  )
+        self.make_constraits( 'mch_jaw_master', 'MCH-jaw_master.003', 'jaw_master', 0.10  )
+        self.make_constraits( 'mch_jaw_master', 'MCH-jaw_master.004', 'jaw_master', 0.025 )
+        
+        for bone in all_bones['mch']['jaw'][1:]:
+            self.make_constraits( 'mch_jaw_master', bone, 'MCH-mouth_lock' )
+            
+        ## Tweak bones constraints
+        
 
     def create_bones(self):
         org_bones = self.org_bones
