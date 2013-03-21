@@ -157,7 +157,6 @@ class Rig:
         tongue_name = strip_org( tongue_org ) + '_master'
         
         tongue_ctrl_name = copy_bone( self.obj, tongue_org, tongue_name )
-        print( "tongue control name: ", tongue_ctrl_name )
         
         flip_bone( self.obj, tongue_ctrl_name )
         
@@ -392,11 +391,8 @@ class Rig:
         
         # Initially parenting all bones to the face org bone.
         for category in list( all_bones.keys() ):
-            # print( category )
             for area in list( all_bones[category] ):
-                # print( "\t", area )
                 for bone in all_bones[category][area]:
-                    # print( "\t\t", bone )
                     eb[ bone ].parent = eb[ face_name ]
         
         ## Parenting all deformation bones
@@ -532,8 +528,6 @@ class Rig:
         bpy.ops.object.mode_set(mode ='OBJECT')
         pb = self.obj.pose.bones
 
-        print( bone, " : ", subtarget, " : ", influence )
-
         owner_pb = pb[bone]
         
         if   constraint_type == 'def_tweak':
@@ -631,7 +625,7 @@ class Rig:
             const.influence = influence
 
     
-    def constraints_and_drivers( self, all_bones ):
+    def constraints( self, all_bones ):
         ## Def bone constraints
       
         def_specials = {
@@ -799,7 +793,59 @@ class Rig:
         for owner in all_bones['mch']['tongue']:
             self.make_constraits( 'mch_tongue_copy_trans', owner, 'tongue_master', ( 1 / divider ) * factor )
             factor -= 1
+
+
+    def drivers_and_props( self, all_bones ):
+        
+        bpy.ops.object.mode_set(mode ='OBJECT')
+        pb = self.obj.pose.bones
+        
+        jaw_ctrl  = all_bones['ctrls']['jaw'][0]
+        eyes_ctrl = all_bones['ctrls']['eyes'][2]
+
+        jaw_prop  = 'mouth_lock'
+        eyes_prop = 'eyes_follow'
+        
+        for bone, prop_name in zip( [ jaw_ctrl, eyes_ctrl ], [ jaw_prop, eyes_prop ] ):
+            if bone == jaw_ctrl:
+                pb[ bone ][ prop_name ] = 0.0
+            else:
+                pb[ bone ][ prop_name ] = 1.0
+
+            prop = rna_idprop_ui_prop_get( pb[ bone ], prop_name )
+            prop["min"]         = 0.0
+            prop["max"]         = 1.0
+            prop["soft_min"]    = 0.0
+            prop["soft_max"]    = 1.0
+            prop["description"] = prop_name
+        
+        # Jaw drivers
+        mch_jaws = all_bones['mch']['jaw'][1:-1]
+        
+        for bone in mch_jaws:
+            drv = pb[ bone ].constraints[1].driver_add("influence").driver
+            drv.type='SUM'
             
+            var = drv.variables.new()
+            var.name = jaw_prop
+            var.type = "SINGLE_PROP"
+            var.targets[0].id = self.obj
+            var.targets[0].data_path = pb[ jaw_ctrl ].path_from_id() + '['+ '"' + jaw_prop + '"' + ']'
+            
+
+        # Eyes driver
+        mch_eyes_parent = all_bones['mch']['eyes_parent'][0]
+
+        drv = pb[ mch_eyes_parent ].constraints[0].driver_add("influence").driver
+        drv.type='SUM'
+        
+        var = drv.variables.new()
+        var.name = eyes_prop
+        var.type = "SINGLE_PROP"
+        var.targets[0].id = self.obj
+        var.targets[0].data_path = pb[ eyes_ctrl ].path_from_id() + '['+ '"' + eyes_prop + '"' + ']'
+        
+
 
     def create_bones(self):
         org_bones = self.org_bones
@@ -825,10 +871,11 @@ class Rig:
             'tweaks' : ctrls['tweaks'], 
             'mch'    : mchs 
             }, tweak_unique
-            
+
 
     def generate(self):
         
         all_bones, tweak_unique = self.create_bones()
         self.parent_bones( all_bones, tweak_unique )
-        self.constraints_and_drivers( all_bones )
+        self.constraints( all_bones )
+        self.drivers_and_props( all_bones )
