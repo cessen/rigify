@@ -9,32 +9,16 @@ from   .super_widgets import create_face_widget, create_eye_widget, create_eyes_
 
 
 script = """
-controls    = [%s]
-head_name   = '%s'
-neck_name   = '%s'
-ribs_name   = '%s'
-pb          = bpy.data.objects['%s'].pose.bones
-torso_name  = '%s'
-for name in controls:
+all_controls   = [%s]
+jaw_ctrl_name  = '%s'
+eyes_ctrl_name = '%s'
+pb = bpy.data.objects['%s'].pose.bones
+
+for name in all_controls:
     if is_selected(name):
-        layout.prop(pb[torso_nam19:20:00e], '["%s"]', slider=True)
+        layout.prop(pb[jaw_ctrl_name],  '["%s"]', slider=True)
+        layout.prop(pb[eyes_ctrl_name], '["%s"]', slider=True)
         break
-for name in controls:
-    if is_selected(name):
-        if name == head_name:
-            layout.prop(pb[torso_name], '["%s"]', slider=True)
-            break
-        if name == neck_name:
-            layout.prop(pb[torso_name], '["%s"]', slider=True)
-            break
-        if name == ribs_name:
-            layout.prop(pb[torso_name], '["%s"]', slider=True)
-            break
-        if name == torso_name:
-            layout.prop(pb[torso_name], '["%s"]', slider=True)
-            layout.prop(pb[torso_name], '["%s"]', slider=True)
-            layout.prop(pb[torso_name], '["%s"]', slider=True)
-            break
 """
 class Rig:
     
@@ -45,6 +29,11 @@ class Rig:
 
         self.org_bones = [bone_name] + [ b.name for b in b[bone_name].children_recursive ]
         self.params = params
+
+        if params.tweak_extra_layers:
+            self.tweak_layers = list(params.tweak_layers)
+        else:
+            self.tweak_layers = None
 
     def symmetrical_split( self, bones ):
 
@@ -235,8 +224,13 @@ class Rig:
                 
                 tweaks.append( tweak_name )
             
-        bpy.ops.object.mode_set(mode ='OBJECT')    
+        bpy.ops.object.mode_set(mode ='OBJECT')
+        pb = self.obj.pose.bones
+            
         for bone in tweaks:
+            if self.tweak_layers:
+                pb[bone].bone.layers = self.tweak_layers
+
             create_face_widget( self.obj, bone )
                     
         return { 'all' : tweaks }
@@ -845,7 +839,7 @@ class Rig:
         var.targets[0].id = self.obj
         var.targets[0].data_path = pb[ eyes_ctrl ].path_from_id() + '['+ '"' + eyes_prop + '"' + ']'
         
-
+        return jaw_prop, eyes_prop
 
     def create_bones(self):
         org_bones = self.org_bones
@@ -878,4 +872,89 @@ class Rig:
         all_bones, tweak_unique = self.create_bones()
         self.parent_bones( all_bones, tweak_unique )
         self.constraints( all_bones )
-        self.drivers_and_props( all_bones )
+        jaw_prop, eyes_prop = self.drivers_and_props( all_bones )
+
+        # Create UI
+        all_controls = []
+        all_controls += [ bone for bone in [ bgroup for bgroup in [ all_bones['ctrls'][group] for group in list( all_bones['ctrls'].keys() ) ] ] ]
+        all_controls += [ bone for bone in [ bgroup for bgroup in [ all_bones['tweaks'][group] for group in list( all_bones['tweaks'].keys() ) ] ] ]
+        
+        all_ctrls = []
+        for group in all_controls:
+            for bone in group:
+                all_ctrls.append( bone )
+        
+        controls_string = ", ".join(["'" + x + "'" for x in all_ctrls])
+        return [ script % (
+            controls_string, 
+            all_bones['ctrls']['jaw'][0],
+            all_bones['ctrls']['eyes'][2],
+            self.obj.name,
+            jaw_prop,
+            eyes_prop )
+            ]
+        
+        
+def add_parameters(params):
+    """ Add the parameters of this rig type to the
+        RigifyParameters PropertyGroup
+    """
+
+    #Setting up extra layers for the tweak bones
+    params.tweak_extra_layers = bpy.props.BoolProperty( 
+        name        = "tweak_extra_layers", 
+        default     = True, 
+        description = ""
+        )
+    params.tweak_layers = bpy.props.BoolVectorProperty(
+        size        = 32,
+        description = "Layers for the tweak controls to be on",
+        default     = tuple( [ i == 1 for i in range(0, 32) ] )
+        )
+
+def parameters_ui(layout, params):
+    """ Create the ui for the rig parameters."""
+    
+    r = layout.row()
+    r.prop(params, "tweak_extra_layers")
+    r.active = params.tweak_extra_layers
+    
+    col = r.column(align=True)
+    row = col.row(align=True)
+    row.prop(params, "tweak_layers", index=0, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=1, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=2, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=3, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=4, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=5, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=6, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=7, toggle=True, text="")
+    row = col.row(align=True)
+    row.prop(params, "tweak_layers", index=16, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=17, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=18, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=19, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=20, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=21, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=22, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=23, toggle=True, text="")
+    
+    col = r.column(align=True)
+    row = col.row(align=True)
+    row.prop(params, "tweak_layers", index=8, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=9, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=10, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=11, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=12, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=13, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=14, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=15, toggle=True, text="")
+    row = col.row(align=True)
+    row.prop(params, "tweak_layers", index=24, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=25, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=26, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=27, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=28, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=29, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=30, toggle=True, text="")
+    row.prop(params, "tweak_layers", index=31, toggle=True, text="")
