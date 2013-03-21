@@ -520,14 +520,16 @@ class Rig:
         def_names = all_bones['def']['def_bones']
         
         def_bones_e = [ eb[bone] for bone in def_names ]
-        
+
         for bone in def_bones_e:
             if def_bones_e.index(bone) == 0:
                 bone.parent = None # Later rigify will parent to root
             # While the rest use simple chain parenting
             else:
                 bone.parent = def_bones_e[ def_bones_e.index(bone) - 1 ]
-                bone.use_connect = True
+                if def_bones_e.index(bone) != len(def_bones_e) - 1:
+                    bone.use_connect = True
+
         
         ## Parenting the org bones to tweak
         parent_bones = [ hips_tweak_name ] + back_tweak_names + neck_tweak_names + [ head_mch_drv_name ]
