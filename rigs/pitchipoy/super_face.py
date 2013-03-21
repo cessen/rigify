@@ -438,6 +438,13 @@ class Rig:
             for ear_def in ear_defs:
                 if ear_ctrl in ear_def:
                     eb[ ear_def ].parent = eb[ ear_ctrl ]
+
+        # Parent eyelid deform bones (each lid def bone is parented to its respective MCH bone)
+        def_lids = [ bone for bone in all_bones['deform']['all'] if 'lid' in bone ]
+        
+        for bone in def_lids:
+            mch = make_mechanism_name( bone[4:] )
+            eb[ bone ].parent = eb[ mch ]
         
         ## Parenting all mch bones
         
@@ -515,6 +522,10 @@ class Rig:
         eb[ 'tongue.001' ].parent = eb[ 'MCH-tongue.001' ]
         eb[ 'tongue.002' ].parent = eb[ 'MCH-tongue.002' ]
 
+        for bone in [ 'ear.L.002', 'ear.L.003', 'ear.L.004' ]:
+            eb[ bone                       ].parent = eb[ 'ear.L' ]
+            eb[ bone.replace( '.L', '.R' ) ].parent = eb[ 'ear.R' ]
+
         
     def make_constraits( self, constraint_type, bone, subtarget, influence = 1 ):
         org_bones = self.org_bones
@@ -579,6 +590,7 @@ class Rig:
             const.target       = self.obj
             const.subtarget    = subtarget
             const.influence    = influence
+            const.use_offset   = True
             const.target_space = 'LOCAL'
             const.owner_space  = 'LOCAL'
         
@@ -587,12 +599,14 @@ class Rig:
             const = owner_pb.constraints.new( 'COPY_ROTATION' )
             const.target       = self.obj
             const.subtarget    = subtarget
+            const.use_offset   = True
             const.target_space = 'LOCAL'
             const.owner_space  = 'LOCAL'
             
             const = owner_pb.constraints.new( 'COPY_SCALE' )
             const.target       = self.obj
             const.subtarget    = subtarget
+            const.use_offset   = True
             const.target_space = 'LOCAL'
             const.owner_space  = 'LOCAL'
         
@@ -604,6 +618,7 @@ class Rig:
             const.influence    = influence
             const.target_space = 'LOCAL'
             const.owner_space  = 'LOCAL'
+            const.use_offset   = True
             const.invert_x     = True
             const.invert_y     = True
             const.invert_z     = True
@@ -627,7 +642,10 @@ class Rig:
             'DEF-chin.R'            : 'lips.R',
             'DEF-jaw.R.001'         : 'chin.R',
             'DEF-brow.T.L.003'      : 'nose',
-            'DEF-ear.L.003'         : 'ear.L',
+            'DEF-ear.L.003'         : 'ear.L.004',
+            'DEF-ear.L.004'         : 'ear.L',
+            'DEF-ear.R.003'         : 'ear.R.004',
+            'DEF-ear.R.004'         : 'ear.R',
             'DEF-lip.B.L.001'       : 'lips.L',
             'DEF-lip.B.R.001'       : 'lips.R',
             'DEF-cheek.B.L.001'     : 'brow.T.L',
@@ -638,15 +656,14 @@ class Rig:
             'DEF-nose.L.001'        : 'nose.002',
             'DEF-cheek.T.R.001'     : 'nose.R',
             'DEF-nose.R.001'        : 'nose.002',
-            'DEF-forehead.L'        : 'brow.T.L.001',
+            'DEF-forehead.L'        : 'brow.T.L.003',
             'DEF-forehead.L.001'    : 'brow.T.L.002',
-            'DEF-forehead.L.002'    : 'brow.T.L.003',
+            'DEF-forehead.L.002'    : 'brow.T.L.001',
             'DEF-temple.L'          : 'jaw.L',
             'DEF-brow.T.R.003'      : 'nose',
-            'DEF-ear.R.003'         : 'ear.R',
-            'DEF-forehead.R'        : 'brow.T.R.001',
+            'DEF-forehead.R'        : 'brow.T.R.003',
             'DEF-forehead.R.001'    : 'brow.T.R.002',
-            'DEF-forehead.R.002'    : 'brow.T.R.003',
+            'DEF-forehead.R.002'    : 'brow.T.R.001',
             'DEF-temple.R'          : 'jaw.R'
         }
 
@@ -664,10 +681,20 @@ class Rig:
                 else:
                     tweak = "".join( matches ) + ".001"
                 self.make_constraits('def_tweak', bone, tweak )
-                
-        for bone in [ bone for bone in all_bones['deform']['all'] if 'lid' in bone ]:
-                mch = make_mechanism_name( bone )
-                self.make_constraits('def_lids', bone, mch )
+        
+        def_lids = sorted( [ bone for bone in all_bones['deform']['all'] if 'lid' in bone ] )
+        mch_lids = sorted( [ bone for bone in all_bones['mch']['lids'] ] )
+        
+        def_lidsL, def_lidsR = self.symmetrical_split( def_lids )
+        mch_lidsL, mch_lidsR = self.symmetrical_split( mch_lids )
+
+        # Take the last mch_lid bone and place it at the end
+        mch_lidsL = mch_lidsL[1:] + [ mch_lidsL[0] ]
+        mch_lidsR = mch_lidsR[1:] + [ mch_lidsR[0] ]
+        
+        for boneL, boneR, mchL, mchR in zip( def_lidsL, def_lidsR, mch_lidsL, mch_lidsR ):
+            self.make_constraits('def_lids', boneL, mchL )
+            self.make_constraits('def_lids', boneR, mchR )
 
         ## MCH constraints
         
@@ -698,46 +725,44 @@ class Rig:
         self.make_constraits( 'mch_jaw_master', 'MCH-jaw_master.003', 'jaw_master', 0.10  )
         self.make_constraits( 'mch_jaw_master', 'MCH-jaw_master.004', 'jaw_master', 0.025 )
         
-        for bone in all_bones['mch']['jaw'][1:]:
+        for bone in all_bones['mch']['jaw'][1:-1]:
             self.make_constraits( 'mch_jaw_master', bone, 'MCH-mouth_lock' )
             
         ## Tweak bones constraints
         
         # copy location constraints for tweak bones of both sides
         tweak_copyloc_L = {
-            'brow.T.L.002'  : [ 'brow.T.L.003',  0.5  ],
-            'brow.T.L.002'  : [ 'brow.T.L.001',  0.5  ],
-            'ear.L.002'     : [ 'ear.L.003',     0.5  ],
-            'ear.L.002'     : [ 'ear.L.001',     0.5  ],
-            'brow.B.L.001'  : [ 'brow.B.L.002',  0.6  ],
-            'brow.B.L.003'  : [ 'brow.B.L.002',  0.6  ],
-            'brow.B.L.002'  : [ 'lid.T.L.001',   0.25 ],
-            'lid.T.L.001'   : [ 'lid.T.L.002',   0.6  ],
-            'lid.T.L.003'   : [ 'lid.T.L.002',   0.6  ],
-            'lid.T.L.002'   : [ 'MCH-eye.L.001', 0.5  ],
-            'lid.B.L.001'   : [ 'lid.B.L.002',   0.6  ],
-            'lid.B.L.003'   : [ 'lid.B.L.002',   0.6  ],
-            'lid.B.L.002'   : [ 'MCH-eye.L.001', 0.5  ],
-            'lid.B.L.002'   : [ 'cheek.T.L.001', 0.1  ],
-            'cheek.T.L.001' : [ 'cheek.B.L.001', 0.5  ],
-            'nose.L'        : [ 'nose.L.001',    0.25 ],
-            'nose.L.001'    : [ 'lip.T.L.001',   0.5  ],
-            'cheek.B.L.001' : [ 'lips.L',        0.5  ],
-            'lip.T.L.001'   : [ 'lip.T',         0.5  ],
-            'lip.T.L.001'   : [ 'lips.L',        0.25 ],
-            'lip.B.L.001'   : [ 'lip.B',         0.5  ],
-            'lip.B.L.001'   : [ 'lips.L',        0.25 ]
+            'brow.T.L.002'  : [ [ 'brow.T.L.001', 'brow.T.L.003'   ], [ 0.5, 0.5  ] ],
+            'ear.L.003'     : [ [ 'ear.L.004', 'ear.L.002'         ], [ 0.5, 0.5  ] ],
+            'brow.B.L.001'  : [ [ 'brow.B.L.002'                   ], [ 0.6       ] ],
+            'brow.B.L.003'  : [ [ 'brow.B.L.002'                   ], [ 0.6       ] ],
+            'brow.B.L.002'  : [ [ 'lid.T.L.001',                   ], [ 0.25      ] ],
+            'lid.T.L.001'   : [ [ 'lid.T.L.002'                    ], [ 0.6       ] ],
+            'lid.T.L.003'   : [ [ 'lid.T.L.002',                   ], [ 0.6       ] ],
+            'lid.T.L.002'   : [ [ 'MCH-eye.L.001',                 ], [ 0.5       ] ],
+            'lid.B.L.001'   : [ [ 'lid.B.L.002',                   ], [ 0.6       ] ],
+            'lid.B.L.003'   : [ [ 'lid.B.L.002',                   ], [ 0.6       ] ],
+            'lid.B.L.002'   : [ [ 'MCH-eye.L.001', 'cheek.T.L.001' ], [ 0.5, 0.1  ] ],
+            'cheek.T.L.001' : [ [ 'cheek.B.L.001',                 ], [ 0.5       ] ],
+            'nose.L'        : [ [ 'nose.L.001',                    ], [ 0.25      ] ],
+            'nose.L.001'    : [ [ 'lip.T.L.001',                   ], [ 0.5       ] ],
+            'cheek.B.L.001' : [ [ 'lips.L',                        ], [ 0.5       ] ],
+            'lip.T.L.001'   : [ [ 'lips.L', 'lip.T'                ], [ 0.25, 0.5 ] ],
+            'lip.B.L.001'   : [ [ 'lips.L', 'lip.B'                ], [ 0.25, 0.5 ] ]
             }
             
         for owner in list( tweak_copyloc_L.keys() ):
-            target    = tweak_copyloc_L[owner][0]
-            influence = tweak_copyloc_L[owner][1]
-            self.make_constraits( 'tweak_copyloc', owner, target, influence )
             
-            # create constraints for the right side too
-            owner.replace( '.L', '.R' )
-            target.replace( '.L', '.R' )
-            self.make_constraits( 'tweak_copyloc', owner, target, influence )
+            targets, influences = tweak_copyloc_L[owner]
+            for target, influence in zip( targets, influences ):
+
+                # Left side constraints                
+                self.make_constraits( 'tweak_copyloc', owner, target, influence )
+                
+                # create constraints for the right side too
+                ownerR  = owner.replace(  '.L', '.R' )
+                targetR = target.replace( '.L', '.R' )
+                self.make_constraits( 'tweak_copyloc', ownerR, targetR, influence )
 
         # copy rotation & scale constraints for tweak bones of both sides
         tweak_copy_rot_scl_L = {
@@ -751,19 +776,20 @@ class Rig:
             self.make_constraits( 'tweak_copy_rot_scl', owner, target )
 
             # create constraints for the right side too
-            owner.replace( '.L', '.R' )
+            owner = owner.replace( '.L', '.R' )
             self.make_constraits( 'tweak_copy_rot_scl', owner, target )
             
-        # nose tweak bones constraints
+        # inverted tweak bones constraints
         tweak_nose = {
-            'Nose.001' : [ 'Nose.002', 0.35 ],
-            'Nose.003' : [ 'Nose.002', 0.5  ],
-            'Nose.005' : [ 'lip.T',    0.5  ]
+            'nose.001' : [ 'nose.002', 0.35 ],
+            'nose.003' : [ 'nose.002', 0.5  ],
+            'nose.005' : [ 'lip.T',    0.5  ],
+            'chin.002' : [ 'lip.B',    0.5  ]
         }
         
         for owner in list( tweak_nose.keys() ):
-            target    = tweak_nose[owner]
-            influence = tweak_nose[owner]
+            target    = tweak_nose[owner][0]
+            influence = tweak_nose[owner][1]
             self.make_constraits( 'tweak_copyloc_inv', owner, target, influence )
             
         # MCH tongue constraints
