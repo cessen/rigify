@@ -5,7 +5,7 @@ from   ...utils       import org, strip_org, make_deformer_name, connected_child
 from   ...utils       import create_circle_widget, create_sphere_widget, create_widget, create_cube_widget
 from   ...utils       import MetarigError
 from   rna_prop_ui    import rna_idprop_ui_prop_get
-from   .super_widgets import create_eye_widget, create_eyes_widget, create_ear_widget, create_jaw_widget, create_teeth_widget
+from   .super_widgets import create_face_widget, create_eye_widget, create_eyes_widget, create_ear_widget, create_jaw_widget, create_teeth_widget
 
 
 script = """
@@ -235,6 +235,10 @@ class Rig:
                 eb[ tweak_name ].tail[:] = eb[ tweak_name ].head + Vector( ( 0, 0, 0.005 ) )
                 
                 tweaks.append( tweak_name )
+            
+        bpy.ops.object.mode_set(mode ='OBJECT')    
+        for bone in tweaks:
+            create_face_widget( self.obj, bone )
                     
         return { 'all' : tweaks }
 
@@ -512,12 +516,104 @@ class Rig:
         eb[ 'tongue.002' ].parent = eb[ 'MCH-tongue.002' ]
 
         
-    def make_constraits( self, bone_type, bone, target, influnce = 1 ):
+    def make_constraits( self, constraint_type, bone, subtarget, influence = 1 ):
         org_bones = self.org_bones
         bpy.ops.object.mode_set(mode ='OBJECT')
         pb = self.obj.pose.bones
 
-        print( bone, " : ", target, " : ", influence )
+        print( bone, " : ", subtarget, " : ", influence )
+
+        owner_pb = pb[bone]
+        
+        if   constraint_type == 'def_tweak':
+
+            const = owner_pb.constraints.new( 'DAMPED_TRACK' )
+            const.target    = self.obj
+            const.subtarget = subtarget
+
+            const = owner_pb.constraints.new( 'STRETCH_TO' )
+            const.target    = self.obj
+            const.subtarget = subtarget
+
+        elif constraint_type == 'def_lids':
+
+            const = owner_pb.constraints.new( 'DAMPED_TRACK' )
+            const.target    = self.obj
+            const.subtarget = subtarget
+            const.head_tail = 1.0
+
+            const = owner_pb.constraints.new( 'STRETCH_TO' )
+            const.target    = self.obj
+            const.subtarget = subtarget
+            const.head_tail = 1.0
+        
+        elif constraint_type == 'mch_eyes':
+        
+            const = owner_pb.constraints.new( 'DAMPED_TRACK' )
+            const.target    = self.obj
+            const.subtarget = subtarget
+        
+        elif constraint_type == 'mch_eyes_lids_follow':
+
+            const = owner_pb.constraints.new( 'COPY_LOCATION' )
+            const.target    = self.obj
+            const.subtarget = subtarget
+            const.head_tail = 1.0
+                    
+        elif constraint_type == 'mch_eyes_parent':
+        
+            const = owner_pb.constraints.new( 'COPY_TRANSFORMS' )
+            const.target    = self.obj
+            const.subtarget = subtarget
+            
+        elif constraint_type == 'mch_jaw_master':
+        
+            const = owner_pb.constraints.new( 'COPY_TRANSFORMS' )
+            const.target    = self.obj
+            const.subtarget = subtarget
+            const.influence = influence
+        
+        elif constraint_type == 'tweak_copyloc':
+        
+            const = owner_pb.constraints.new( 'COPY_LOCATION' )
+            const.target       = self.obj
+            const.subtarget    = subtarget
+            const.influence    = influence
+            const.target_space = 'LOCAL'
+            const.owner_space  = 'LOCAL'
+        
+        elif constraint_type == 'tweak_copy_rot_scl':
+        
+            const = owner_pb.constraints.new( 'COPY_ROTATION' )
+            const.target       = self.obj
+            const.subtarget    = subtarget
+            const.target_space = 'LOCAL'
+            const.owner_space  = 'LOCAL'
+            
+            const = owner_pb.constraints.new( 'COPY_SCALE' )
+            const.target       = self.obj
+            const.subtarget    = subtarget
+            const.target_space = 'LOCAL'
+            const.owner_space  = 'LOCAL'
+        
+        elif constraint_type == 'tweak_copyloc_inv':
+        
+            const = owner_pb.constraints.new( 'COPY_LOCATION' )
+            const.target       = self.obj
+            const.subtarget    = subtarget
+            const.influence    = influence
+            const.target_space = 'LOCAL'
+            const.owner_space  = 'LOCAL'
+            const.invert_x     = True
+            const.invert_y     = True
+            const.invert_z     = True
+        
+        elif constraint_type == 'mch_tongue_copy_trans':
+        
+            const = owner_pb.constraints.new( 'COPY_TRANSFORMS' )
+            const.target    = self.obj
+            const.subtarget = subtarget
+            const.influence = influence
 
     
     def constraints_and_drivers( self, all_bones ):
@@ -558,7 +654,7 @@ class Rig:
 
         for bone in [ bone for bone in all_bones['deform']['all'] if 'lid' not in bone ]:
             if bone in list( def_specials.keys() ):
-                self.make_constraits('def_spec', bone, def_specials[bone] )
+                self.make_constraits('def_tweak', bone, def_specials[bone] )
             else:
                 matches = re.match( pattern, bone ).groups()
                 if len( matches ) > 1 and matches[-1]:
@@ -567,10 +663,9 @@ class Rig:
                     tweak = "".join( str_list )
                 else:
                     tweak = "".join( matches ) + ".001"
-                self.make_constraits('def_def', bone, tweak )
+                self.make_constraits('def_tweak', bone, tweak )
                 
-        for bone in all_bones['deform']['all']:
-            if 'lid' in bone:
+        for bone in [ bone for bone in all_bones['deform']['all'] if 'lid' in bone ]:
                 mch = make_mechanism_name( bone )
                 self.make_constraits('def_lids', bone, mch )
 
@@ -579,14 +674,14 @@ class Rig:
         # mch lids constraints
         for bone in all_bones['mch']['lids']:
             tweak = bone[4:]  # remove "MCH-" from bone name
-            self.make_constraits('mch_lids', bone, tweak )
+            self.make_constraits('mch_eyes', bone, tweak )
         
         # mch eyes constraints
-        for bone in [ 'MCH-eye.L', 'MCH-eye.R' ]
+        for bone in [ 'MCH-eye.L', 'MCH-eye.R' ]:
             ctrl = bone[4:]  # remove "MCH-" from bone name
-            self.make_constraits('mch_eyes_follow', bone, ctrl )
+            self.make_constraits('mch_eyes', bone, ctrl )
         
-        for bone in [ 'MCH-eye.L.001', 'MCH-eye.R.001' ]
+        for bone in [ 'MCH-eye.L.001', 'MCH-eye.R.001' ]:
             target = bone[:-4] # remove number from the end of the name
             self.make_constraits('mch_eyes_lids_follow', bone, target )
             
@@ -608,6 +703,77 @@ class Rig:
             
         ## Tweak bones constraints
         
+        # copy location constraints for tweak bones of both sides
+        tweak_copyloc_L = {
+            'brow.T.L.002'  : [ 'brow.T.L.003',  0.5  ],
+            'brow.T.L.002'  : [ 'brow.T.L.001',  0.5  ],
+            'ear.L.002'     : [ 'ear.L.003',     0.5  ],
+            'ear.L.002'     : [ 'ear.L.001',     0.5  ],
+            'brow.B.L.001'  : [ 'brow.B.L.002',  0.6  ],
+            'brow.B.L.003'  : [ 'brow.B.L.002',  0.6  ],
+            'brow.B.L.002'  : [ 'lid.T.L.001',   0.25 ],
+            'lid.T.L.001'   : [ 'lid.T.L.002',   0.6  ],
+            'lid.T.L.003'   : [ 'lid.T.L.002',   0.6  ],
+            'lid.T.L.002'   : [ 'MCH-eye.L.001', 0.5  ],
+            'lid.B.L.001'   : [ 'lid.B.L.002',   0.6  ],
+            'lid.B.L.003'   : [ 'lid.B.L.002',   0.6  ],
+            'lid.B.L.002'   : [ 'MCH-eye.L.001', 0.5  ],
+            'lid.B.L.002'   : [ 'cheek.T.L.001', 0.1  ],
+            'cheek.T.L.001' : [ 'cheek.B.L.001', 0.5  ],
+            'nose.L'        : [ 'nose.L.001',    0.25 ],
+            'nose.L.001'    : [ 'lip.T.L.001',   0.5  ],
+            'cheek.B.L.001' : [ 'lips.L',        0.5  ],
+            'lip.T.L.001'   : [ 'lip.T',         0.5  ],
+            'lip.T.L.001'   : [ 'lips.L',        0.25 ],
+            'lip.B.L.001'   : [ 'lip.B',         0.5  ],
+            'lip.B.L.001'   : [ 'lips.L',        0.25 ]
+            }
+            
+        for owner in list( tweak_copyloc_L.keys() ):
+            target    = tweak_copyloc_L[owner][0]
+            influence = tweak_copyloc_L[owner][1]
+            self.make_constraits( 'tweak_copyloc', owner, target, influence )
+            
+            # create constraints for the right side too
+            owner.replace( '.L', '.R' )
+            target.replace( '.L', '.R' )
+            self.make_constraits( 'tweak_copyloc', owner, target, influence )
+
+        # copy rotation & scale constraints for tweak bones of both sides
+        tweak_copy_rot_scl_L = {
+            'lip.T.L.001' : 'lip.T',
+            'lip.B.L.001' : 'lip.B'
+        }
+        
+        for owner in list( tweak_copy_rot_scl_L.keys() ):
+            target    = tweak_copy_rot_scl_L[owner]
+            influence = tweak_copy_rot_scl_L[owner]
+            self.make_constraits( 'tweak_copy_rot_scl', owner, target )
+
+            # create constraints for the right side too
+            owner.replace( '.L', '.R' )
+            self.make_constraits( 'tweak_copy_rot_scl', owner, target )
+            
+        # nose tweak bones constraints
+        tweak_nose = {
+            'Nose.001' : [ 'Nose.002', 0.35 ],
+            'Nose.003' : [ 'Nose.002', 0.5  ],
+            'Nose.005' : [ 'lip.T',    0.5  ]
+        }
+        
+        for owner in list( tweak_nose.keys() ):
+            target    = tweak_nose[owner]
+            influence = tweak_nose[owner]
+            self.make_constraits( 'tweak_copyloc_inv', owner, target, influence )
+            
+        # MCH tongue constraints
+        divider = len( all_bones['mch']['tongue'] ) + 1
+        factor  = len( all_bones['mch']['tongue'] )
+
+        for owner in all_bones['mch']['tongue']:
+            self.make_constraits( 'mch_tongue_copy_trans', owner, 'tongue_master', ( 1 / divider ) * factor )
+            factor -= 1
+            
 
     def create_bones(self):
         org_bones = self.org_bones
