@@ -59,13 +59,15 @@ class FKLimb:
         flimb = copy_bone(self.obj, self.org_bones[1], strip_org(insert_before_lr(self.org_bones[1], ".fk")))
         elimb = copy_bone(self.obj, self.org_bones[2], strip_org(insert_before_lr(self.org_bones[2], ".fk")))
 
-        # Create the anti-stretch bones
-        fantistr = copy_bone(self.obj, self.org_bones[0], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[0], "_antistr.fk"))))
-        eantistr = copy_bone(self.obj, self.org_bones[1], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[1], "_antistr.fk"))))
-
         # Create the end-limb mechanism bone
         elimb_mch = copy_bone(self.obj, self.org_bones[2], make_mechanism_name(strip_org(self.org_bones[2])))
 
+        # Create the anti-stretch bones
+        # These sit between a parent and its child, and counteract the
+        # stretching of the parent so that the child is unaffected
+        fantistr = copy_bone(self.obj, self.org_bones[0], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[0], "_antistr.fk"))))
+        eantistr = copy_bone(self.obj, self.org_bones[1], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[1], "_antistr.fk"))))
+        
         # Create the hinge bones
         if parent != None:
             socket1 = copy_bone(self.obj, ulimb, make_mechanism_name(ulimb + ".socket1"))
@@ -807,25 +809,35 @@ class RubberHoseLimb:
                 lr = lr[1]
 
             # Create bones
+            # Deformation bones
             ulimb1 = copy_bone(self.obj, self.org_bones[0], make_deformer_name(strip_org(insert_before_lr(self.org_bones[0], ".01"))))
             ulimb2 = copy_bone(self.obj, self.org_bones[0], make_deformer_name(strip_org(insert_before_lr(self.org_bones[0], ".02"))))
             flimb1 = copy_bone(self.obj, self.org_bones[1], make_deformer_name(strip_org(insert_before_lr(self.org_bones[1], ".01"))))
             flimb2 = copy_bone(self.obj, self.org_bones[1], make_deformer_name(strip_org(insert_before_lr(self.org_bones[1], ".02"))))
             elimb = copy_bone(self.obj, self.org_bones[2], make_deformer_name(strip_org(self.org_bones[2])))
 
+            # Bones for switchable smooth bbone transition at elbow/knee
             ulimb2_smoother = copy_bone(self.obj, self.org_bones[1], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[0], "_smth.02"))))
             flimb1_smoother = copy_bone(self.obj, self.org_bones[0], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[1], "_smth.01"))))
             flimb1_pos = copy_bone(self.obj, self.org_bones[1], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[1], ".01"))))
 
+            # Elbow/knee junction bone
             junc = copy_bone(self.obj, self.org_bones[1], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[1], ".junc"))))
 
+            # Hose controls
+            uhoseend = new_bone(self.obj, strip_org(insert_before_lr(self.org_bones[0], "_hose_end")))
             uhose = new_bone(self.obj, strip_org(insert_before_lr(self.org_bones[0], "_hose")))
             jhose = new_bone(self.obj, self.junc_base_name + "_hose." + lr)
             fhose = new_bone(self.obj, strip_org(insert_before_lr(self.org_bones[1], "_hose")))
+            fhoseend = new_bone(self.obj, strip_org(insert_before_lr(self.org_bones[1], "_hose_end")))
 
-            uhose_par = copy_bone(self.obj, self.org_bones[0], make_mechanism_name(strip_org(insert_before_lr(uhose, "_parent"))))
-            jhose_par = copy_bone(self.obj, junc, make_mechanism_name(strip_org(insert_before_lr(jhose, "_parent"))))
-            fhose_par = copy_bone(self.obj, self.org_bones[1], make_mechanism_name(strip_org(insert_before_lr(fhose, "_parent"))))
+
+            # Hose control parents
+            uhoseend_par = copy_bone(self.obj, self.org_bones[0], make_mechanism_name(strip_org(insert_before_lr(uhoseend, "_p"))))
+            uhose_par = copy_bone(self.obj, self.org_bones[0], make_mechanism_name(strip_org(insert_before_lr(uhose, "_p"))))
+            jhose_par = copy_bone(self.obj, junc, make_mechanism_name(strip_org(insert_before_lr(jhose, "_p"))))
+            fhose_par = copy_bone(self.obj, self.org_bones[1], make_mechanism_name(strip_org(insert_before_lr(fhose, "_p"))))
+            fhoseend_par = copy_bone(self.obj, self.org_bones[1], make_mechanism_name(strip_org(insert_before_lr(fhoseend, "_p"))))
 
             # Get edit bones
             eb = self.obj.data.edit_bones
@@ -847,13 +859,17 @@ class RubberHoseLimb:
 
             junc_e = eb[junc]
 
+            uhoseend_e = eb[uhoseend]
             uhose_e = eb[uhose]
             jhose_e = eb[jhose]
             fhose_e = eb[fhose]
+            fhoseend_e = eb[fhoseend]
 
+            uhoseend_par_e = eb[uhoseend_par]
             uhose_par_e = eb[uhose_par]
             jhose_par_e = eb[jhose_par]
             fhose_par_e = eb[fhose_par]
+            fhoseend_par_e = eb[fhoseend_par]
 
             # Parenting
             if parent != None:
@@ -884,6 +900,9 @@ class RubberHoseLimb:
             junc_e.use_connect = False
             junc_e.parent = eb[self.org_bones[0]]
 
+            uhoseend_e.use_connect = False
+            uhoseend_e.parent = uhoseend_par_e
+
             uhose_e.use_connect = False
             uhose_e.parent = uhose_par_e
 
@@ -893,6 +912,12 @@ class RubberHoseLimb:
             fhose_e.use_connect = False
             fhose_e.parent = fhose_par_e
 
+            fhoseend_e.use_connect = False
+            fhoseend_e.parent = fhoseend_par_e
+
+            uhoseend_par_e.use_connect = False
+            uhoseend_par_e.parent = parent_e
+
             uhose_par_e.use_connect = False
             uhose_par_e.parent = parent_e
 
@@ -901,6 +926,9 @@ class RubberHoseLimb:
 
             fhose_par_e.use_connect = False
             fhose_par_e.parent = parent_e
+
+            fhoseend_par_e.use_connect = False
+            fhoseend_par_e.parent = parent_e
 
             # Positioning
             ulimb1_e.length *= 0.5
@@ -917,16 +945,22 @@ class RubberHoseLimb:
 
             junc_e.length *= 0.2
 
+            uhoseend_par_e.length *= 0.25
             uhose_par_e.length *= 0.25
             jhose_par_e.length *= 0.15
             fhose_par_e.length *= 0.25
+            fhoseend_par_e.length *= 0.25
+            put_bone(self.obj, uhoseend_par, Vector(ulimb1_e.head))
             put_bone(self.obj, uhose_par, Vector(ulimb1_e.tail))
             put_bone(self.obj, jhose_par, Vector(ulimb2_e.tail))
             put_bone(self.obj, fhose_par, Vector(flimb1_e.tail))
+            put_bone(self.obj, fhoseend_par, Vector(flimb2_e.tail))
 
+            put_bone(self.obj, uhoseend, Vector(ulimb1_e.head))
             put_bone(self.obj, uhose, Vector(ulimb1_e.tail))
             put_bone(self.obj, jhose, Vector(ulimb2_e.tail))
             put_bone(self.obj, fhose, Vector(flimb1_e.tail))
+            put_bone(self.obj, fhoseend, Vector(flimb2_e.tail))
 
             if 'X' in self.primary_rotation_axis:
                 upoint = Vector(ulimb1_e.z_axis)
@@ -949,18 +983,24 @@ class RubberHoseLimb:
                 uside = Vector(ulimb1_e.y_axis) * -1
                 fside = Vector(flimb1_e.y_axis) * -1
 
+            uhoseend_e.tail = uhoseend_e.head + upoint
             uhose_e.tail = uhose_e.head + upoint
             jhose_e.tail = fhose_e.head + upoint + fpoint
             fhose_e.tail = fhose_e.head + fpoint
+            fhoseend_e.tail = fhoseend_e.head + fpoint
 
+            align_bone_z_axis(self.obj, uhoseend, uside)
             align_bone_z_axis(self.obj, uhose, uside)
             align_bone_z_axis(self.obj, jhose, uside + fside)
             align_bone_z_axis(self.obj, fhose, fside)
+            align_bone_z_axis(self.obj, fhoseend, fside)
 
             l = 0.125 * (ulimb1_e.length + ulimb2_e.length + flimb1_e.length + flimb2_e.length)
+            uhoseend_e.length = l
             uhose_e.length = l
             jhose_e.length = l
             fhose_e.length = l
+            fhoseend_e.length = l
 
             # Object mode, get pose bones
             bpy.ops.object.mode_set(mode='OBJECT')
@@ -978,13 +1018,17 @@ class RubberHoseLimb:
 
             junc_p = pb[junc]
 
+            uhoseend_p = pb[uhoseend]
             uhose_p = pb[uhose]
             jhose_p = pb[jhose]
             fhose_p = pb[fhose]
+            fhoseend_p = pb[fhoseend]
 
+            uhoseend_par_p = pb[uhoseend_par]
             uhose_par_p = pb[uhose_par]
             jhose_par_p = pb[jhose_par]
             fhose_par_p = pb[fhose_par]
+            fhoseend_par_p = pb[fhoseend_par]
 
             # Lock axes
             uhose_p.lock_rotation = (True, True, True)
@@ -1023,6 +1067,10 @@ class RubberHoseLimb:
             prop["soft_max"] = prop["max"] = 1.0
 
             # Constraints
+            con = ulimb1_p.constraints.new('COPY_LOCATION')
+            con.name = "anchor"
+            con.target = self.obj
+            con.subtarget = uhoseend
             con = ulimb1_p.constraints.new('COPY_SCALE')
             con.name = "anchor"
             con.target = self.obj
@@ -1112,11 +1160,11 @@ class RubberHoseLimb:
             con = flimb2_p.constraints.new('DAMPED_TRACK')
             con.name = "track"
             con.target = self.obj
-            con.subtarget = self.org_bones[2]
+            con.subtarget = fhoseend
             con = flimb2_p.constraints.new('STRETCH_TO')
             con.name = "track"
             con.target = self.obj
-            con.subtarget = self.org_bones[2]
+            con.subtarget = fhoseend
             con.volume = 'NO_VOLUME'
 
             con = junc_p.constraints.new('COPY_TRANSFORMS')
@@ -1167,21 +1215,38 @@ class RubberHoseLimb:
             con.target = self.obj
             con.subtarget = self.org_bones[2]
             con.influence = 0.5
+            
+            con = fhoseend_par_p.constraints.new('COPY_ROTATION')
+            con.name = "follow"
+            con.target = self.obj
+            con.subtarget = self.org_bones[1]
+            con.influence = 1.0
+            con = fhoseend_par_p.constraints.new('COPY_LOCATION')
+            con.name = "anchor"
+            con.target = self.obj
+            con.subtarget = self.org_bones[2]
+            con.influence = 1.0
 
             # Layers
             if self.layers:
+                uhoseend_p.bone.layers = self.layers
                 uhose_p.bone.layers = self.layers
                 jhose_p.bone.layers = self.layers
                 fhose_p.bone.layers = self.layers
+                fhoseend_p.bone.layers = self.layers
             else:
                 layers = list(pb[self.org_bones[0]].bone.layers)
+                uhoseend_p.bone.layers = layers
                 uhose_p.bone.layers = layers
                 jhose_p.bone.layers = layers
                 fhose_p.bone.layers = layers
+                fhoseend_p.bone.layers = layers
 
             # Create widgets
+            create_sphere_widget(self.obj, uhoseend)
             create_sphere_widget(self.obj, uhose)
             create_sphere_widget(self.obj, jhose)
             create_sphere_widget(self.obj, fhose)
+            create_sphere_widget(self.obj, fhoseend)
 
-            return [uhose, jhose, fhose]
+            return [uhoseend, uhose, jhose, fhose, fhoseend]

@@ -142,7 +142,6 @@ def copy_bone_simple(obj, bone_name, assign_name=''):
     """
     #if bone_name not in obj.data.bones:
     if bone_name not in obj.data.edit_bones:
-    
         raise MetarigError("copy_bone(): bone '%s' not found, cannot copy it" % bone_name)
 
     if obj == bpy.context.active_object and bpy.context.mode == 'EDIT_ARMATURE':
@@ -171,7 +170,6 @@ def copy_bone(obj, bone_name, assign_name=''):
     """
     #if bone_name not in obj.data.bones:
     if bone_name not in obj.data.edit_bones:
-    
         raise MetarigError("copy_bone(): bone '%s' not found, cannot copy it" % bone_name)
 
     if obj == bpy.context.active_object and bpy.context.mode == 'EDIT_ARMATURE':
