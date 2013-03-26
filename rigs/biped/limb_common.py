@@ -840,7 +840,7 @@ class RubberHoseLimb:
             flimb1_e = eb[flimb1]
             flimb2_e = eb[flimb2]
             elimb_e = eb[elimb]
-            
+
             ulimb2_smoother_e = eb[ulimb2_smoother]
             flimb1_smoother_e = eb[flimb1_smoother]
             flimb1_pos_e = eb[flimb1_pos]
@@ -862,16 +862,16 @@ class RubberHoseLimb:
 
             ulimb2_e.use_connect = False
             ulimb2_e.parent = eb[self.org_bones[0]]
-            
+
             ulimb2_smoother_e.use_connect = True
             ulimb2_smoother_e.parent = ulimb2_e
 
             flimb1_e.use_connect = True
             flimb1_e.parent = flimb1_smoother_e
-            
+
             flimb1_smoother_e.use_connect = False
             flimb1_smoother_e.parent = flimb1_pos_e
-            
+
             flimb1_pos_e.use_connect = False
             flimb1_pos_e.parent = eb[self.org_bones[1]]
 
@@ -911,7 +911,7 @@ class RubberHoseLimb:
 
             ulimb2_smoother_e.tail = Vector(flimb1_e.tail)
             ulimb2_smoother_e.roll = flimb1_e.roll
-            
+
             flimb1_smoother_e.head = Vector(ulimb1_e.tail)
             flimb1_pos_e.length *= 0.5
 
@@ -971,7 +971,7 @@ class RubberHoseLimb:
             flimb1_p = pb[flimb1]
             flimb2_p = pb[flimb2]
             elimb_p = pb[elimb]
-            
+
             ulimb2_smoother_p = pb[ulimb2_smoother]
             flimb1_smoother_p = pb[flimb1_smoother]
             flimb1_pos_p = pb[flimb1_pos]
@@ -1003,7 +1003,7 @@ class RubberHoseLimb:
             ulimb2_p.bone.bbone_segments = 16
             ulimb2_p.bone.bbone_in = 0.0
             ulimb2_p.bone.bbone_out = 1.0
-            
+
             ulimb2_smoother_p.bone.bbone_segments = 16
             ulimb2_smoother_p.bone.bbone_in = 1.0
             ulimb2_smoother_p.bone.bbone_out = 0.0
@@ -1011,7 +1011,7 @@ class RubberHoseLimb:
             flimb1_p.bone.bbone_segments = 16
             flimb1_p.bone.bbone_in = 1.0
             flimb1_p.bone.bbone_out = 0.0
-            
+
             flimb1_smoother_p.bone.bbone_segments = 16
             flimb1_smoother_p.bone.bbone_in = 0.0
             flimb1_smoother_p.bone.bbone_out = 1.0
@@ -1050,7 +1050,7 @@ class RubberHoseLimb:
             con.target = self.obj
             con.subtarget = jhose
             con.volume = 'NO_VOLUME'
-            
+
             con = ulimb2_smoother_p.constraints.new('COPY_TRANSFORMS')
             con.name = "smoother"
             con.target = self.obj
@@ -1077,12 +1077,12 @@ class RubberHoseLimb:
             con.target = self.obj
             con.subtarget = fhose
             con.volume = 'NO_VOLUME'
-            
+
             con = flimb1_p.constraints.new('COPY_TRANSFORMS')
             con.name = "position"
             con.target = self.obj
             con.subtarget = flimb1_pos
-            
+
             con = flimb1_smoother_p.constraints.new('COPY_TRANSFORMS')
             con.name = "smoother"
             con.target = self.obj
