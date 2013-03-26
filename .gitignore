@@ -34,5 +34,5 @@ nosetests.xml
 .project
 .pydevproject
 
-# Save backups
+# Temp files
 *~

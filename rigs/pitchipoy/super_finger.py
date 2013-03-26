@@ -74,6 +74,8 @@ class Rig:
 
 
     def generate(self):
+        org_bones = self.org_bones
+        
         bpy.ops.object.mode_set(mode ='EDIT')
         eb = self.obj.data.edit_bones
         
@@ -87,12 +89,16 @@ class Rig:
         org_name  = self.org_bones[0]
         temp_name = strip_org(self.org_bones[0])
         
-        master_name = temp_name + "_master"
-        ctrl_bone_master = self.obj.data.edit_bones.new(master_name)
-        ctrl_bone_master.head[:] = eb[org_name].head
-        ctrl_bone_master.tail[:] = eb[self.org_bones[-1]].tail
-        ctrl_bone_master.roll    = eb[org_name].roll
-        ctrl_bone_master.parent  = eb[org_name].parent
+        master_name      = temp_name + "_master"
+        master_name      = copy_bone( self.obj, org_name, master_name )
+        ctrl_bone_master = eb[ master_name ]
+        
+        ## Parenting bug fix ??
+        ctrl_bone_master.use_connect = False
+        ctrl_bone_master.parent      = None
+        
+        ctrl_bone_master.tail += ( eb[ org_bones[-1] ].tail - eb[org_name].head ) * 1.25
+        
         
         # Creating the bone chains
         for i in range(len(self.org_bones)):
@@ -124,9 +130,22 @@ class Rig:
             mch_drv_chain += [drv_name]
         
         # Clear initial parenting
-        for b in eb:
-            if b not in self.org_bones:
-                b.parent = None
+        #for b in eb:
+        #    if b not in self.org_bones:
+        #        b.parent = None
+        
+        all_bones = org_bones[1:] + ctrl_chain + def_chain + mch_chain + mch_drv_chain + [ master_name ]
+        # Clear parents for all bones no first org.. (??)
+        for bone in all_bones:
+            eb[bone].use_connect = False
+            eb[bone].parent      = None
+        
+        # Restoring org chain parenting
+        for bone in org_bones[1:]:
+            eb[bone].parent = eb[ org_bones.index(bone) ]
+        
+        # Parenting the master bone to the first org
+        ctrl_bone_master.parent = eb[ org_bones[0] ]
         
         # Parenting chain bones
         for i in range(len(self.org_bones)):
@@ -151,33 +170,26 @@ class Rig:
                 mch_bone_drv_e.use_connect  = False
             else:
                 # The rest
-                print (ctrl_bone_e.parent)
                 ctrl_bone_e.parent         = mch_bone_drv_e
                 ctrl_bone_e.use_connect    = False 
-                print (ctrl_bone_e.parent)
                 
-                print (def_bone_e.parent)
                 def_bone_e.parent          = eb[def_chain[i-1]]
                 def_bone_e.use_connect     = True
-                print (def_bone_e.parent)
                 
-                print (mch_bone_drv_e.parent)
                 mch_bone_drv_e.parent      = eb[ctrl_chain[i-1]]
                 mch_bone_drv_e.use_connect = False
-                print (mch_bone_drv_e.parent)
 
                 # Parenting mch bone
-                mch_bone_e.parent = ctrl_bone_e
+                mch_bone_e.parent      = ctrl_bone_e
                 mch_bone_e.use_connect = False
                 
         # Creating tip conrtol bone 
-        ctrl_bone_tip = self.obj.data.edit_bones.new(temp_name)
+        tip_name      = copy_bone( self.obj, org_bones[-1], temp_name )
+        ctrl_bone_tip = eb[ tip_name ]
+        ctrl_bone_tip.tail    += ( eb[ctrl_chain[-1]].tail - eb[ctrl_chain[-1]].head ) / 2
         ctrl_bone_tip.head[:] = eb[ctrl_chain[-1]].tail
-        tail_vec = Vector((0, 0, 0.005)) * self.obj.matrix_world
-        ctrl_bone_tip.tail[:] = eb[ctrl_chain[-1]].tail + tail_vec
-        ctrl_bone_tip.roll    = eb[ctrl_chain[-1]].roll
-        ctrl_bone_tip.parent  = eb[ctrl_chain[-1]]
-        tip_name    = ctrl_bone_tip.name
+
+        ctrl_bone_tip.parent = eb[ctrl_chain[-1]]
 
         bpy.ops.object.mode_set(mode ='OBJECT')
         
@@ -185,13 +197,14 @@ class Rig:
         
         # Setting pose bones locks
         pb_master = pb[master_name]
-        pb_master.lock_scale = True,False,True
+        pb_master.lock_location = True,True,True
+        pb_master.lock_scale    = True,False,True
         
         pb[tip_name].lock_scale      = True,True,True
         pb[tip_name].lock_rotation   = True,True,True
         pb[tip_name].lock_rotation_w = True
         
-        pb_master['finger_curve'] = 1.0
+        pb_master['finger_curve'] = 0.0
         prop = rna_idprop_ui_prop_get(pb_master, 'finger_curve')
         prop["min"] = 0.0
         prop["max"] = 1.0
@@ -203,9 +216,9 @@ class Rig:
         for org, ctrl, deform, mch, mch_drv in zip(self.org_bones, ctrl_chain, def_chain, mch_chain, mch_drv_chain):
             
             # Constraining the org bones
-            con           = pb[org].constraints.new('COPY_TRANSFORMS')
-            con.target    = self.obj
-            con.subtarget = ctrl
+            #con           = pb[org].constraints.new('COPY_TRANSFORMS')
+            #con.target    = self.obj
+            #con.subtarget = ctrl
 
             # Constraining the deform bones
             con           = pb[deform].constraints.new('COPY_TRANSFORMS')
@@ -336,7 +349,7 @@ class Rig:
             mesh.update()
         
         # Create tip control widget
-        create_sphere_widget(self.obj, tip_name)
+        create_circle_widget(self.obj, tip_name, radius=0.3, head_tail=0.0)
         
         if not self.params.thumb:
             self.make_palm(master_name, ctrl_chain[0], mch_chain[0], mch_drv_chain[0])
@@ -354,7 +367,7 @@ def add_parameters(params):
     items = [('X', 'X', ''), ('Y', 'Y', ''), ('Z', 'Z', ''), ('-X', '-X', ''), ('-Y', '-Y', ''), ('-Z', '-Z', '')]
     params.primary_rotation_axis = bpy.props.EnumProperty(items=items, name="Primary Rotation Axis", default='X')
 
-    params.thumb = bpy.props.BoolProperty(name="thumb", default=False, description="Finger/Thumb")
+    params.thumb = bpy.props.BoolProperty(name="thumb", default=True, description="Finger/Thumb")
 
 def parameters_ui(layout, params):
     """ Create the ui for the rig parameters.
