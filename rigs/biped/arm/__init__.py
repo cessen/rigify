@@ -56,6 +56,8 @@ if is_selected(fk_arm):
 if is_selected(ik_arm):
     layout.prop(pose_bones[ik_arm[2]], '["stretch_length"]', text="Length IK (" + ik_arm[2] + ")", slider=True)
     layout.prop(pose_bones[ik_arm[2]], '["auto_stretch"]', text="Auto-Stretch IK (" + ik_arm[2] + ")", slider=True)
+if is_selected([ik_arm[3]]):
+    layout.prop(pose_bones[ik_arm[3]], '["follow"]', text="Follow Parent (" + ik_arm[3] + ")", slider=True)
 """
 
 hose_script = """

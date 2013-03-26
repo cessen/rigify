@@ -67,7 +67,7 @@ class FKLimb:
         # stretching of the parent so that the child is unaffected
         fantistr = copy_bone(self.obj, self.org_bones[0], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[0], "_antistr.fk"))))
         eantistr = copy_bone(self.obj, self.org_bones[1], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[1], "_antistr.fk"))))
-        
+
         # Create the hinge bones
         if parent != None:
             socket1 = copy_bone(self.obj, ulimb, make_mechanism_name(ulimb + ".socket1"))
@@ -299,7 +299,7 @@ class IKLimb:
     """ An IK limb rig, with an optional ik/fk switch.
 
     """
-    def __init__(self, obj, bone1, bone2, bone3, pole_target_base_name, primary_rotation_axis, bend_hint, layers, ikfk_switch=False):
+    def __init__(self, obj, bone1, bone2, bone3, pole_parent, pole_target_base_name, primary_rotation_axis, bend_hint, layers, ikfk_switch=False):
         self.obj = obj
         self.switch = ikfk_switch
 
@@ -311,6 +311,8 @@ class IKLimb:
             self.org_parent = None
         else:
             self.org_parent = self.obj.data.bones[bone1].parent.name
+
+        self.pole_parent = pole_parent
 
         # Get the rig parameters
         self.pole_target_base_name = pole_target_base_name
@@ -325,6 +327,8 @@ class IKLimb:
         if self.org_parent != None:
             loc = Vector(self.obj.data.edit_bones[self.org_bones[0]].head)
             parent = make_nonscaling_child(self.obj, self.org_parent, loc, "_ik")
+            if self.pole_parent == None:
+                self.pole_parent = parent
         else:
             parent = None
 
@@ -342,6 +346,10 @@ class IKLimb:
 
         pole_target_name = self.pole_target_base_name + "." + insert_before_lr(self.org_bones[0], ".ik").split(".", 1)[1]
         pole = copy_bone(self.obj, self.org_bones[0], pole_target_name)
+        if self.pole_parent == self.org_bones[2]:
+            self.pole_parent = elimb_mch
+        if self.pole_parent != None:
+            pole_par = copy_bone(self.obj, self.pole_parent, make_mechanism_name(insert_before_lr(pole_target_name, "_parent")))
 
         viselimb = copy_bone(self.obj, self.org_bones[2], "VIS-" + strip_org(insert_before_lr(self.org_bones[2], ".ik")))
         vispole = copy_bone(self.obj, self.org_bones[1], "VIS-" + strip_org(insert_before_lr(self.org_bones[0], "_pole.ik")))
@@ -360,6 +368,8 @@ class IKLimb:
         ulimb_str_e = eb[ulimb_str]
         flimb_str_e = eb[flimb_str]
         pole_e = eb[pole]
+        if self.pole_parent != None:
+            pole_par_e = eb[pole_par]
         viselimb_e = eb[viselimb]
         vispole_e = eb[vispole]
 
@@ -386,8 +396,9 @@ class IKLimb:
         flimb_str_e.parent = ulimb_e.parent
 
         pole_e.use_connect = False
-        if parent != None:
-            pole_e.parent = parent_e
+        if self.pole_parent != None:
+            pole_par_e.parent = None
+            pole_e.parent = pole_par_e
 
         viselimb_e.use_connect = False
         viselimb_e.parent = None
@@ -420,6 +431,8 @@ class IKLimb:
         pole_e.head = flimb_e.head + v2
         pole_e.tail = pole_e.head + (Vector((0, 1, 0)) * (v1.length / 8))
         pole_e.roll = 0.0
+        if parent != None:
+            pole_par_e.length *= 0.75
 
         viselimb_e.tail = viselimb_e.head + Vector((0, 0, v1.length / 32))
         vispole_e.tail = vispole_e.head + Vector((0, 0, v1.length / 32))
@@ -442,6 +455,8 @@ class IKLimb:
         ulimb_str_p = pb[ulimb_str]
         flimb_str_p = pb[flimb_str]
         pole_p = pb[pole]
+        if self.pole_parent != None:
+            pole_par_p = pb[pole_par]
         viselimb_p = pb[viselimb]
         vispole_p = pb[vispole]
 
@@ -488,6 +503,12 @@ class IKLimb:
         if self.switch is True:
             prop = rna_idprop_ui_prop_get(elimb_p, "ikfk_switch", create=True)
             elimb_p["ikfk_switch"] = 0.0
+            prop["soft_min"] = prop["min"] = 0.0
+            prop["soft_max"] = prop["max"] = 1.0
+
+        if self.pole_parent != None:
+            prop = rna_idprop_ui_prop_get(pole_p, "follow", create=True)
+            pole_p["follow"] = 1.0
             prop["soft_min"] = prop["min"] = 0.0
             prop["soft_max"] = prop["max"] = 1.0
 
@@ -619,6 +640,21 @@ class IKLimb:
         con = flimb_str_p.constraints.new('MAINTAIN_VOLUME')
         con.name = "stretch"
         con.owner_space = 'LOCAL'
+
+        # Pole target parent
+        if self.pole_parent != None:
+            con = pole_par_p.constraints.new('COPY_TRANSFORMS')
+            con.name = "parent"
+            con.target = self.obj
+            con.subtarget = self.pole_parent
+
+            driver = con.driver_add("influence").driver
+            var = driver.variables.new()
+            var.name = "follow"
+            var.targets[0].id_type = 'OBJECT'
+            var.targets[0].id = self.obj
+            var.targets[0].data_path = pole_p.path_from_id() + '["follow"]'
+            driver.type = 'SUM'
 
         # Constrain org bones
         con = pb[self.org_bones[0]].constraints.new('COPY_TRANSFORMS')
@@ -831,7 +867,6 @@ class RubberHoseLimb:
             fhose = new_bone(self.obj, strip_org(insert_before_lr(self.org_bones[1], "_hose")))
             fhoseend = new_bone(self.obj, strip_org(insert_before_lr(self.org_bones[1], "_hose_end")))
 
-
             # Hose control parents
             uhoseend_par = copy_bone(self.obj, self.org_bones[0], make_mechanism_name(strip_org(insert_before_lr(uhoseend, "_p"))))
             uhose_par = copy_bone(self.obj, self.org_bones[0], make_mechanism_name(strip_org(insert_before_lr(uhose, "_p"))))
@@ -1024,7 +1059,7 @@ class RubberHoseLimb:
             fhose_p = pb[fhose]
             fhoseend_p = pb[fhoseend]
 
-            uhoseend_par_p = pb[uhoseend_par]
+            #uhoseend_par_p = pb[uhoseend_par]
             uhose_par_p = pb[uhose_par]
             jhose_par_p = pb[jhose_par]
             fhose_par_p = pb[fhose_par]
@@ -1215,7 +1250,7 @@ class RubberHoseLimb:
             con.target = self.obj
             con.subtarget = self.org_bones[2]
             con.influence = 0.5
-            
+
             con = fhoseend_par_p.constraints.new('COPY_ROTATION')
             con.name = "follow"
             con.target = self.obj
