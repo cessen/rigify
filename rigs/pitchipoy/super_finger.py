@@ -1,6 +1,6 @@
 import bpy
 from mathutils import Vector
-from ...utils import copy_bone
+from ...utils import copy_bone, flip_bone
 from ...utils import strip_org, make_deformer_name, connected_children_names, make_mechanism_name
 from ...utils import create_circle_widget, create_sphere_widget, create_widget
 from ...utils import MetarigError
@@ -20,57 +20,11 @@ class Rig:
     
     def __init__(self, obj, bone_name, params):
         self.obj = obj
-        if not params.thumb:
-            self.palm      = bone_name
-            self.org_bones = connected_children_names(obj, bone_name)
-        else:
-            self.org_bones = [bone_name] + connected_children_names(obj, bone_name)
+        self.org_bones = [bone_name] + connected_children_names(obj, bone_name)
         self.params = params
         
         if len(self.org_bones) <= 1:
             raise MetarigError("RIGIFY ERROR: Bone '%s': listen bro, that finger rig jusaint put tugetha rite. A little hint, use more than one bone!!" % (strip_org(bone_name)))            
-
-    def make_palm(self, master_name, ctrl_first, mch_first, mch_drv_first):
-
-        bpy.ops.object.mode_set(mode ='EDIT')
-        eb = self.obj.data.edit_bones
-
-        name      = self.palm
-        ctrl_name = strip_org(name)
-        
-        # Create control bone
-        ctrl_bone   = copy_bone(self.obj, name, ctrl_name )
-        ctrl_bone_e = eb[ctrl_name]
-
-        # Making the master bone child of the palm
-        ctrl_bone_master = eb[master_name]
-        ctrl_bone_master.parent  = ctrl_bone_e
-        eb[mch_first].parent     = ctrl_bone_e
-        eb[mch_drv_first].parent = ctrl_bone_e
-
-        # Create deformation bone
-        def_name   = make_deformer_name(ctrl_name)
-        def_bone   = copy_bone(self.obj, name, def_name )
-
-        def_bone_e        = eb[def_bone]
-        def_bone_e.parent = eb[ctrl_bone]
-
-        bpy.ops.object.mode_set(mode ='OBJECT')
-
-        pb = self.obj.pose.bones
-
-        # Constraining the deform bone
-        con           = pb[def_bone].constraints.new('DAMPED_TRACK')
-        con.target    = self.obj
-        con.subtarget = ctrl_first
-
-        con           = pb[def_bone].constraints.new('STRETCH_TO')
-        con.target    = self.obj
-        con.subtarget = ctrl_first
-        con.volume    = 'NO_VOLUME'
-
-        # Assigning shapes to control bones
-        create_circle_widget(self.obj, ctrl_bone, radius=0.3, head_tail=0.5)
 
 
     def generate(self):
@@ -98,7 +52,11 @@ class Rig:
         ctrl_bone_master.parent      = None
         
         ctrl_bone_master.tail += ( eb[ org_bones[-1] ].tail - eb[org_name].head ) * 1.25
-        
+
+        for bone in org_bones:
+            eb[bone].use_connect = False
+            if org_bones.index( bone ) != 0:
+               eb[bone].parent      = None
         
         # Creating the bone chains
         for i in range(len(self.org_bones)):
@@ -107,16 +65,16 @@ class Rig:
             ctrl_name = strip_org(name)
             
             # Create control bones
-            ctrl_bone   = copy_bone(self.obj, name, ctrl_name )
-            ctrl_bone_e = eb[ctrl_name]
+            ctrl_bone   = copy_bone( self.obj, name, ctrl_name )
+            ctrl_bone_e = eb[ ctrl_name ]
             
             # Create deformation bones
-            def_name  = make_deformer_name(ctrl_name)
-            def_bone  = copy_bone(self.obj, name, def_name )
+            def_name  = make_deformer_name( ctrl_name )
+            def_bone  = copy_bone( self.obj, name, def_name )
 
             # Create mechanism bones
-            mch_name  = make_mechanism_name(ctrl_name)
-            mch_bone  = copy_bone(self.obj, name, mch_name )
+            mch_name  = make_mechanism_name( ctrl_name )
+            mch_bone  = copy_bone( self.obj, name, mch_name )
             
             # Create mechanism driver bones
             drv_name  = make_mechanism_name(ctrl_name) + "_drv"
@@ -129,22 +87,12 @@ class Rig:
             mch_chain     += [mch_bone]
             mch_drv_chain += [drv_name]
         
-        # Clear initial parenting
-        #for b in eb:
-        #    if b not in self.org_bones:
-        #        b.parent = None
-        
-        all_bones = org_bones[1:] + ctrl_chain + def_chain + mch_chain + mch_drv_chain + [ master_name ]
-        # Clear parents for all bones no first org.. (??)
-        for bone in all_bones:
-            eb[bone].use_connect = False
-            eb[bone].parent      = None
-        
         # Restoring org chain parenting
         for bone in org_bones[1:]:
-            eb[bone].parent = eb[ org_bones.index(bone) ]
+            eb[bone].parent = eb[ org_bones[ org_bones.index(bone) - 1 ] ]
         
         # Parenting the master bone to the first org
+        ctrl_bone_master = eb[ master_name ]
         ctrl_bone_master.parent = eb[ org_bones[0] ]
         
         # Parenting chain bones
@@ -186,8 +134,8 @@ class Rig:
         # Creating tip conrtol bone 
         tip_name      = copy_bone( self.obj, org_bones[-1], temp_name )
         ctrl_bone_tip = eb[ tip_name ]
-        ctrl_bone_tip.tail    += ( eb[ctrl_chain[-1]].tail - eb[ctrl_chain[-1]].head ) / 2
-        ctrl_bone_tip.head[:] = eb[ctrl_chain[-1]].tail
+        flip_bone( self.obj, tip_name )
+        ctrl_bone_tip.length /= 2
 
         ctrl_bone_tip.parent = eb[ctrl_chain[-1]]
 
@@ -197,7 +145,6 @@ class Rig:
         
         # Setting pose bones locks
         pb_master = pb[master_name]
-        pb_master.lock_location = True,True,True
         pb_master.lock_scale    = True,False,True
         
         pb[tip_name].lock_scale      = True,True,True
@@ -351,14 +298,10 @@ class Rig:
         # Create tip control widget
         create_circle_widget(self.obj, tip_name, radius=0.3, head_tail=0.0)
         
-        if not self.params.thumb:
-            self.make_palm(master_name, ctrl_chain[0], mch_chain[0], mch_drv_chain[0])
-        
         # Create UI
         controls_string = ", ".join(["'" + x + "'" for x in ctrl_chain]) + ", " + "'" + master_name + "'"
         return [script % (controls_string, self.obj.name, master_name, 'finger_curve')]
            
-
         
 def add_parameters(params):
     """ Add the parameters of this rig type to the
@@ -367,19 +310,13 @@ def add_parameters(params):
     items = [('X', 'X', ''), ('Y', 'Y', ''), ('Z', 'Z', ''), ('-X', '-X', ''), ('-Y', '-Y', ''), ('-Z', '-Z', '')]
     params.primary_rotation_axis = bpy.props.EnumProperty(items=items, name="Primary Rotation Axis", default='X')
 
-    params.thumb = bpy.props.BoolProperty(name="thumb", default=True, description="Finger/Thumb")
 
 def parameters_ui(layout, params):
     """ Create the ui for the rig parameters.
     """
     r = layout.row()
     r.label(text="Bend rotation axis:")
-    r.prop(params, "primary_rotation_axis", text="")
-    
-    r = layout.row()
-    r.label(text="Make thumb")
-    r.prop(params, "thumb", text="")
-    
+    r.prop(params, "primary_rotation_axis", text="")    
     
     
     
