@@ -652,7 +652,7 @@ def create(obj):
     bone.head[:] = 0.5324, -0.0170, 1.1769
     bone.tail[:] = 0.5574, -0.0197, 1.1597
     bone.roll = -2.4236
-    bone.use_connect = True
+    bone.use_connect = False
     bone.parent = arm.edit_bones[bones['palm.01.L']]
     bones['f_index.01.L'] = bone.name
     bone = arm.edit_bones.new('thumb.01.L')
@@ -666,28 +666,28 @@ def create(obj):
     bone.head[:] = 0.5318, 0.0020, 1.1780
     bone.tail[:] = 0.5617, 0.0011, 1.1570
     bone.roll = -2.4677
-    bone.use_connect = True
+    bone.use_connect = False
     bone.parent = arm.edit_bones[bones['palm.02.L']]
     bones['f_middle.01.L'] = bone.name
     bone = arm.edit_bones.new('f_ring.01.L')
     bone.head[:] = 0.5300, 0.0170, 1.1779
     bone.tail[:] = 0.5581, 0.0196, 1.1599
     bone.roll = -2.6117
-    bone.use_connect = True
+    bone.use_connect = False
     bone.parent = arm.edit_bones[bones['palm.03.L']]
     bones['f_ring.01.L'] = bone.name
     bone = arm.edit_bones.new('f_pinky.01.L')
     bone.head[:] = 0.5254, 0.0328, 1.1744
     bone.tail[:] = 0.5483, 0.0372, 1.1578
     bone.roll = -2.6528
-    bone.use_connect = True
+    bone.use_connect = False
     bone.parent = arm.edit_bones[bones['palm.04.L']]
     bones['f_pinky.01.L'] = bone.name
     bone = arm.edit_bones.new('f_index.01.R')
     bone.head[:] = -0.5324, -0.0170, 1.1769
     bone.tail[:] = -0.5574, -0.0197, 1.1597
     bone.roll = 2.4236
-    bone.use_connect = True
+    bone.use_connect = False
     bone.parent = arm.edit_bones[bones['palm.01.R']]
     bones['f_index.01.R'] = bone.name
     bone = arm.edit_bones.new('thumb.01.R')
@@ -701,21 +701,21 @@ def create(obj):
     bone.head[:] = -0.5318, 0.0020, 1.1780
     bone.tail[:] = -0.5617, 0.0011, 1.1570
     bone.roll = 2.4677
-    bone.use_connect = True
+    bone.use_connect = False
     bone.parent = arm.edit_bones[bones['palm.02.R']]
     bones['f_middle.01.R'] = bone.name
     bone = arm.edit_bones.new('f_ring.01.R')
     bone.head[:] = -0.5300, 0.0170, 1.1779
     bone.tail[:] = -0.5581, 0.0196, 1.1599
     bone.roll = 2.6117
-    bone.use_connect = True
+    bone.use_connect = False
     bone.parent = arm.edit_bones[bones['palm.03.R']]
     bones['f_ring.01.R'] = bone.name
     bone = arm.edit_bones.new('f_pinky.01.R')
     bone.head[:] = -0.5254, 0.0328, 1.1744
     bone.tail[:] = -0.5483, 0.0372, 1.1578
     bone.roll = 2.6528
-    bone.use_connect = True
+    bone.use_connect = False
     bone.parent = arm.edit_bones[bones['palm.04.R']]
     bones['f_pinky.01.R'] = bone.name
     bone = arm.edit_bones.new('nose.002')
@@ -1988,8 +1988,8 @@ def create(obj):
     pbone.rotation_mode = 'QUATERNION'
     pbone.bone.layers = [True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
     pbone = obj.pose.bones[bones['f_index.01.L']]
-    pbone.rigify_type = 'finger'
-    pbone.lock_location = (True, True, True)
+    pbone.rigify_type = 'pitchipoy.super_finger'
+    pbone.lock_location = (False, False, False)
     pbone.lock_rotation = (False, False, False)
     pbone.lock_rotation_w = False
     pbone.lock_scale = (False, False, False)
@@ -2008,8 +2008,8 @@ def create(obj):
     except AttributeError:
         pass
     pbone = obj.pose.bones[bones['thumb.01.L']]
-    pbone.rigify_type = 'finger'
-    pbone.lock_location = (True, True, True)
+    pbone.rigify_type = 'pitchipoy.super_finger'
+    pbone.lock_location = (False, False, False)
     pbone.lock_rotation = (False, False, False)
     pbone.lock_rotation_w = False
     pbone.lock_scale = (False, False, False)
@@ -2028,8 +2028,8 @@ def create(obj):
     except AttributeError:
         pass
     pbone = obj.pose.bones[bones['f_middle.01.L']]
-    pbone.rigify_type = 'finger'
-    pbone.lock_location = (True, True, True)
+    pbone.rigify_type = 'pitchipoy.super_finger'
+    pbone.lock_location = (False, False, False)
     pbone.lock_rotation = (False, False, False)
     pbone.lock_rotation_w = False
     pbone.lock_scale = (False, False, False)
@@ -2048,8 +2048,8 @@ def create(obj):
     except AttributeError:
         pass
     pbone = obj.pose.bones[bones['f_ring.01.L']]
-    pbone.rigify_type = 'finger'
-    pbone.lock_location = (True, True, True)
+    pbone.rigify_type = 'pitchipoy.super_finger'
+    pbone.lock_location = (False, False, False)
     pbone.lock_rotation = (False, False, False)
     pbone.lock_rotation_w = False
     pbone.lock_scale = (False, False, False)
@@ -2068,8 +2068,8 @@ def create(obj):
     except AttributeError:
         pass
     pbone = obj.pose.bones[bones['f_pinky.01.L']]
-    pbone.rigify_type = 'finger'
-    pbone.lock_location = (True, True, True)
+    pbone.rigify_type = 'pitchipoy.super_finger'
+    pbone.lock_location = (False, False, False)
     pbone.lock_rotation = (False, False, False)
     pbone.lock_rotation_w = False
     pbone.lock_scale = (False, False, False)
@@ -2088,8 +2088,8 @@ def create(obj):
     except AttributeError:
         pass
     pbone = obj.pose.bones[bones['f_index.01.R']]
-    pbone.rigify_type = 'finger'
-    pbone.lock_location = (True, True, True)
+    pbone.rigify_type = 'pitchipoy.super_finger'
+    pbone.lock_location = (False, False, False)
     pbone.lock_rotation = (False, False, False)
     pbone.lock_rotation_w = False
     pbone.lock_scale = (False, False, False)
@@ -2108,8 +2108,8 @@ def create(obj):
     except AttributeError:
         pass
     pbone = obj.pose.bones[bones['thumb.01.R']]
-    pbone.rigify_type = 'finger'
-    pbone.lock_location = (True, True, True)
+    pbone.rigify_type = 'pitchipoy.super_finger'
+    pbone.lock_location = (False, False, False)
     pbone.lock_rotation = (False, False, False)
     pbone.lock_rotation_w = False
     pbone.lock_scale = (False, False, False)
@@ -2128,8 +2128,8 @@ def create(obj):
     except AttributeError:
         pass
     pbone = obj.pose.bones[bones['f_middle.01.R']]
-    pbone.rigify_type = 'finger'
-    pbone.lock_location = (True, True, True)
+    pbone.rigify_type = 'pitchipoy.super_finger'
+    pbone.lock_location = (False, False, False)
     pbone.lock_rotation = (False, False, False)
     pbone.lock_rotation_w = False
     pbone.lock_scale = (False, False, False)
@@ -2148,8 +2148,8 @@ def create(obj):
     except AttributeError:
         pass
     pbone = obj.pose.bones[bones['f_ring.01.R']]
-    pbone.rigify_type = 'finger'
-    pbone.lock_location = (True, True, True)
+    pbone.rigify_type = 'pitchipoy.super_finger'
+    pbone.lock_location = (False, False, False)
     pbone.lock_rotation = (False, False, False)
     pbone.lock_rotation_w = False
     pbone.lock_scale = (False, False, False)
@@ -2168,8 +2168,8 @@ def create(obj):
     except AttributeError:
         pass
     pbone = obj.pose.bones[bones['f_pinky.01.R']]
-    pbone.rigify_type = 'finger'
-    pbone.lock_location = (True, True, True)
+    pbone.rigify_type = 'pitchipoy.super_finger'
+    pbone.lock_location = (False, False, False)
     pbone.lock_rotation = (False, False, False)
     pbone.lock_rotation_w = False
     pbone.lock_scale = (False, False, False)
