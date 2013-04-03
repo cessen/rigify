@@ -1066,6 +1066,10 @@ class RubberHoseLimb:
             fhoseend_par_p = pb[fhoseend_par]
 
             # Lock axes
+            uhoseend_p.lock_rotation = (True, True, True)
+            uhoseend_p.lock_rotation_w = True
+            uhoseend_p.lock_scale = (True, True, True)
+
             uhose_p.lock_rotation = (True, True, True)
             uhose_p.lock_rotation_w = True
             uhose_p.lock_scale = (True, True, True)
@@ -1077,6 +1081,10 @@ class RubberHoseLimb:
             fhose_p.lock_rotation = (True, True, True)
             fhose_p.lock_rotation_w = True
             fhose_p.lock_scale = (True, True, True)
+
+            fhoseend_p.lock_rotation = (True, True, True)
+            fhoseend_p.lock_rotation_w = True
+            fhoseend_p.lock_scale = (True, True, True)
 
             # B-bone settings
             ulimb2_p.bone.bbone_segments = 16
