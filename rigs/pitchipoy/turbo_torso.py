@@ -553,12 +553,13 @@ class Rig:
         
         owner_mch_rot_bones = [ neck_mch_rot, head_mch_rot ]
         
-        hips_mch_drv_name  = all_bones['hips']['mch_drv']
-        back_mch_drv_names = all_bones['back']['mch_drv_bones']
-        neck_mch_drv_names = all_bones['neck']['mch_drv_bones']
-        head_mch_drv_name  = all_bones['head']['mch_drv']
+        hips_mch_drv  = all_bones['hips']['mch_drv']
+        back_mch_drvs = all_bones['back']['mch_drv_bones']
+        neck_mch_drvs = all_bones['neck']['mch_drv_bones']
+        head_mch_drv  = all_bones['head']['mch_drv']
         
-        mch_drv_bones = [ hips_mch_drv_name ] + back_mch_drv_names + neck_mch_drv_names + [ head_mch_drv_name ]
+        mch_drv_bones = \
+            [ hips_mch_drv ] + back_mch_drvs + neck_mch_drvs + [ head_mch_drv ]
         
         # Setting the torso's props
         props_list = [ "neck_follow", "head_follow" ]
@@ -586,7 +587,8 @@ class Rig:
             var.name = prop
             var.type = "SINGLE_PROP"
             var.targets[0].id = self.obj
-            var.targets[0].data_path = pb_torso.path_from_id() + '['+ '"' + prop + '"' + ']'
+            var.targets[0].data_path = \
+                pb_torso.path_from_id() + '['+ '"' + prop + '"' + ']'
         
 
     def bone_properties( self, all_bones ):
@@ -644,11 +646,23 @@ class Rig:
         tweak_names = [ hips_tweak_name ] + back_tweak_names + neck_tweak_names
         
         # Assigning a widget to torso bone
-        create_cube_widget(self.obj, torso_name, radius=0.5, bone_transform_name=None)
+        create_cube_widget(
+            self.obj, 
+            torso_name, 
+            radius              = 0.5, 
+            bone_transform_name = None
+        )
         
         # Assigning widgets to control bones
         for bone in control_names:
-            create_circle_widget(self.obj, bone, radius=1.25, head_tail=0.5, with_line=False, bone_transform_name=None)
+            create_circle_widget(
+                self.obj, 
+                bone, 
+                radius              = 1.25, 
+                head_tail           = 0.5, 
+                with_line           = False, 
+                bone_transform_name = None
+            )
         
         # Assigning widgets to tweak bones and layers
         for bone in tweak_names:
