@@ -10,30 +10,16 @@ script = """
 controls    = [%s]
 head_name   = '%s'
 neck_name   = '%s'
-ribs_name   = '%s'
 pb          = bpy.data.objects['%s'].pose.bones
 torso_name  = '%s'
+
 for name in controls:
-    if is_selected(name):
-        layout.prop(pb[torso_name], '["%s"]', slider=True)
+    if is_selected( name ):
+        layout.prop( pb[ torso_name ], '["%s"]', slider = True )
+        layout.prop( pb[ torso_name ], '["%s"]', slider = True )
         break
-for name in controls:
-    if is_selected(name):
-        if name == head_name:
-            layout.prop(pb[torso_name], '["%s"]', slider=True)
-            break
-        if name == neck_name:
-            layout.prop(pb[torso_name], '["%s"]', slider=True)
-            break
-        if name == ribs_name:
-            layout.prop(pb[torso_name], '["%s"]', slider=True)
-            break
-        if name == torso_name:
-            layout.prop(pb[torso_name], '["%s"]', slider=True)
-            layout.prop(pb[torso_name], '["%s"]', slider=True)
-            layout.prop(pb[torso_name], '["%s"]', slider=True)
-            break
 """
+
 class Rig:
     
     def __init__(self, obj, bone_name, params):
@@ -51,23 +37,6 @@ class Rig:
             raise MetarigError(
                 "RIGIFY ERROR: invalid rig structure" % (strip_org(bone_name))
             )            
-
-
-    def position_bones( self, anchor, bones, size = 1 ):
-
-        bpy.ops.object.mode_set(mode ='EDIT')
-        eb = self.obj.data.edit_bones        
-
-        anchor_e = eb[anchor]
-
-        no_of_bones     = len(bones)
-        distance_vector = ( anchor_e.tail - anchor_e.head ) / no_of_bones
-        
-        for i in range(no_of_bones):
-            bone_e         = eb[bones[i]]
-            bone_e.head[:] = anchor_e.head + distance_vector * i
-            bone_e.tail[:] = bone_e.head   + distance_vector / size
-            bone_e.roll    = anchor_e.roll
 
 
     def create_torso( self ):
@@ -343,127 +312,78 @@ class Rig:
         eb = self.obj.data.edit_bones
         
         # Clearing out previous parenting save the org bones
-        for category in all_bones.keys():
-            for bones in all_bones[category].keys():
+        for category in all_bones:
+            for bones in all_bones[category]:
                 if isinstance( all_bones[category][bones], list ):
                     for bone in all_bones[category][bones]:
                         eb[bone].parent = None
                 else:
                     eb[ all_bones[category][bones] ].parent = None
         
-    
-        # Parenting the torso and its children
+        # Parenting the torso bone
         torso_name = all_bones['torso']['ctrl']
-        torso_bone_e = eb[torso_name]
-        torso_bone_e.parent = None  # Later rigify will parent to root
+        torso_ctrl_e = eb[ torso_name ]
+        torso_ctrl_e.parent = None  # Later rigify will parent to root
         
         # Parenting the hips' bones
-        
-        hips_ctrl_name    = all_bones['hips']['ctrl']
-        hips_mch_drv_name = all_bones['hips']['mch_drv']
-        hips_tweak_name   = all_bones['hips']['tweak']
-        hips_mch_name     = all_bones['hips']['mch']
-        
-        hips_ctrl_bone_e    = eb[hips_ctrl_name]
-        hips_mch_drv_bone_e = eb[hips_mch_drv_name]
-        hips_tweak_bone_e   = eb[hips_tweak_name]
-        hips_mch_bone_e     = eb[hips_mch_name]
-        
-        hips_ctrl_bone_e.parent    = torso_bone_e
-        hips_mch_drv_bone_e.parent = hips_ctrl_bone_e
-        hips_tweak_bone_e.parent   = hips_mch_drv_bone_e
-        hips_mch_bone_e.parent     = hips_tweak_bone_e
+        hips_name          = all_bones['hips']['ctrl']        
+        hips_ctrl_e        = eb[hips_ctrl_name]        
+        hips_ctrl_e.parent = torso_ctrl_e
+
+        hips_tweak_name     = all_bones['hips']['tweak']
+        hips_tweak_e        = eb[hips_tweak_name]
+        hips_tweak_e.parent = hips_ctrl_e
         
         # Parenting the back bones
+        ribs_ctrl_name     = all_bones['back']['ribs_ctrl']        
+        ribs_ctrl_e        = eb[ribs_ctrl_name]
+        ribs_ctrl_e.parent = torso_ctrl_e
+
+        back_mch_drv_names   = all_bones['back']['mch_drv_bones']
+        back_mch_drvs_e = [ eb[bone] for bone in back_mch_drv_names ]
+
+        back_mch_drvs_e[0].parent = hips_ctrl_e
+        back_mch_drvs_e[1].parent = torso_ctrl_e
+
+        back_tweak_names = all_bones['back']['tweak_bones']
+        back_tweaks_e    = [ eb[bone] for bone in back_tweak_names ]
         
-        torso_name         = all_bones['torso']['ctrl']
-        spine_ctrl_name    = all_bones['back']['spine_ctrl']
-        back_mch_rot_names = all_bones['back']['mch_rot_bones']
-        ribs_ctrl_name     = all_bones['back']['ribs_ctrl']
-        back_mch_str_name  = all_bones['back']['mch_stretch']
-        back_mch_drv_names = all_bones['back']['mch_drv_bones']
-        back_tweak_names   = all_bones['back']['tweak_bones']
-        back_mch_names     = all_bones['back']['mch_bones']
-        
-        spine_ctrl_bone_e    = eb[spine_ctrl_name]
-        back_mch_rot_bones_e = [ eb[name] for name in back_mch_rot_names ]
-        ribs_ctrl_bone_e     = eb[ribs_ctrl_name]
-        back_mch_str_bone_e  = eb[back_mch_str_name]
-        back_mch_drv_bones_e = [ eb[bone] for bone in back_mch_drv_names ]
-        back_tweak_bones_e   = [ eb[bone] for bone in back_tweak_names ]
-        back_mch_bones_e     = [ eb[bone] for bone in back_mch_names ]
-        
-        back_mch_rot_bones_e[0].parent = None
-        back_mch_rot_bones_e[1].parent = spine_ctrl_bone_e
-        spine_ctrl_bone_e.parent       = torso_bone_e
-        ribs_ctrl_bone_e.parent        = back_mch_rot_bones_e[0]
-        back_mch_str_bone_e.parent     = hips_ctrl_bone_e
-        
-        for drv, tweak, mch in zip( back_mch_drv_bones_e, back_tweak_bones_e, back_mch_bones_e ):
-            
-            if back_mch_drv_bones_e.index(drv) == 0:
-                drv.parent = back_mch_str_bone_e
-            else:
-                drv.parent = ribs_ctrl_bone_e
-            
-            tweak.parent = drv
-            mch.parent   = tweak
+        back_tweaks_e[0].parent = back_mch_drvs_e[0]
+        back_tweaks_e[1].parent = back_mch_drvs_e[1]
+        back_tweaks_e[2].parent = ribs_ctrl_e
         
         # Parenting the neck bones
-        neck_mch_rot_names = all_bones['neck']['mch_rot_bones']
-        neck_ctrl_name     = all_bones['neck']['ctrl']
-        neck_mch_str_name  = all_bones['neck']['mch_stretch']
-        neck_mch_drv_names = all_bones['neck']['mch_drv_bones']
-        neck_tweak_names   = all_bones['neck']['tweak_bones']
-        neck_mch_names     = all_bones['neck']['mch_bones']
+        neck_mch_rot     = all_bones['neck']['mch_rot']
+        neck_ctrl_name   = all_bones['neck']['ctrl']
+        neck_mch_drv     = all_bones['neck']['mch_drv']
+        neck_tweak_names = all_bones['neck']['tweak_bones']
         
-        neck_mch_rot_bones_e = [ eb[name] for name in neck_mch_rot_names ]
-        neck_ctrl_bone_e     = eb[neck_ctrl_name]
-        neck_mch_str_bone_e  = eb[neck_mch_str_name]
-        neck_mch_drv_bones_e = [ eb[bone] for bone in neck_mch_drv_names ]
-        neck_tweak_bones_e   = [ eb[bone] for bone in neck_tweak_names ]
-        neck_mch_bones_e     = [ eb[bone] for bone in neck_mch_names ]
+        neck_mch_rot_e  = eb[ neck_mch_rot ]
+        neck_ctrl_e     = eb[neck_ctrl_name]
+        neck_mch_drv_e  = eb[ neck_mch_drv ]
+        neck_tweaks_e   = [ eb[bone] for bone in neck_tweak_names ]
         
-        neck_mch_rot_bones_e[0].parent = None  # Later rigify will parent to root
-        neck_mch_rot_bones_e[1].parent = ribs_ctrl_bone_e
-        neck_ctrl_bone_e.parent        = neck_mch_rot_bones_e[0]
-        neck_mch_str_bone_e.parent     = neck_ctrl_bone_e
-        
-        for drv, tweak, mch in zip( neck_mch_drv_bones_e, neck_tweak_bones_e, neck_mch_bones_e ):
-            drv.parent   = neck_mch_str_bone_e
-            tweak.parent = drv
-            mch.parent   = tweak
+        neck_mch_rot_e.parent   = None  # Later rigify will parent to root
+        neck_ctrl_e.parent      = neck_mch_rot_e
+        neck_mch_drv_e.parent   = neck_ctrl_e
+        neck_tweaks_e[0].parent = neck_ctrl_e
+        neck_tweaks_e[1].parent = neck_mch_drv_e
         
         # Parenting the head bones
-        head_mch_rot_names = all_bones['head']['mch_rot_bones']
-        head_ctrl_name     = all_bones['head']['ctrl']
-        head_mch_drv_name  = all_bones['head']['mch_drv']
+        head_mch_rot = all_bones['head']['mch_rot']
+        head_ctrl    = all_bones['head']['ctrl']
+        head_mch_drv = all_bones['head']['mch_drv']
         
-        head_mch_rot_bones_e = [ eb[name] for name in head_mch_rot_names ]
-        head_ctrl_bone_e    = eb[head_ctrl_name]
-        head_mch_drv_bone_e = eb[head_mch_drv_name]
+        head_mch_rot_e = eb[ head_mch_rot ]
+        head_ctrl_e    = eb[ head_ctrl    ]
+        head_mch_drv_e = eb[ head_mch_drv ]
         
-        head_mch_rot_bones_e[0].parent = None  # Later rigify will parent to root
-        head_mch_rot_bones_e[1].parent = neck_ctrl_bone_e
-        head_ctrl_bone_e.parent        = head_mch_rot_bones_e[0]
-        head_mch_drv_bone_e.parent     = head_mch_rot_bones_e[0]
-        
-        # Parenting the fk bones
-        fk_names = all_bones['fk']['fk_bones']
-        
-        fk_bones_e = [ eb[bone] for bone in fk_names ]
-        
-        for bone in fk_bones_e:
-            # Hips fk  parented directly to the torso bone 
-            if fk_bones_e.index(bone) == 0:
-                bone.parent = torso_bone_e
-            # While the rest use simple chain parenting
-            else:
-                bone.parent = fk_bones_e[ fk_bones_e.index(bone) - 1 ]
+        head_mch_rot_e.parent = None  # Later rigify will parent to root
+        head_ctrl_e.parent    = head_mch_rot_e
+        head_mch_drv_e.parent = neck_ctrl_e
         
         # Parenting the deformation bones
-        def_names = all_bones['def']['def_bones']
-        
+        def_names   = all_bones['def']['def_bones']
         def_bones_e = [ eb[bone] for bone in def_names ]
 
         for bone in def_bones_e:
@@ -474,10 +394,10 @@ class Rig:
                 bone.parent = def_bones_e[ def_bones_e.index(bone) - 1 ]
                 if def_bones_e.index(bone) != len(def_bones_e) - 1:
                     bone.use_connect = True
-
         
         ## Parenting the org bones to tweak
-        parent_bones = [ hips_tweak_name ] + back_tweak_names + neck_tweak_names + [ head_mch_drv_name ]
+        parent_bones = \
+            [hips_tweak_name] + back_tweak_names + neck_tweak_names + [head_ctrl]
         
         for bone, parent in zip( org_bones, parent_bones ):
             eb[bone].use_connect = False
@@ -485,155 +405,103 @@ class Rig:
             
 
     def constraints_data( self, all_bones ):
-        ## Big mama: the dictionary that contains all the information about the constraints
+        ## Big mama: the dict that contains all the info about the constraints
+        
         constraint_data = {}
         
         org_bones = self.org_bones
         
-        # MCH Rotation bone names (1)
-        ribs_mch_rot_names = all_bones['back']['mch_rot_bones']
-        neck_mch_rot_names = all_bones['neck']['mch_rot_bones']
-        head_mch_rot_names = all_bones['head']['mch_rot_bones']
-        
-        owner_mch_rot_bones = [ ribs_mch_rot_names[0], neck_mch_rot_names[0], head_mch_rot_names[0] ]
-        
-        # MCH Stretch bone names (2)
-        back_mch_str_name = all_bones['back']['mch_stretch']
-        neck_mch_str_name = all_bones['neck']['mch_stretch']
-        
-        mch_str_bones = [ back_mch_str_name, neck_mch_str_name ]
-        
-        # MCH DRV bone names (3)
-        hips_mch_drv_name  = all_bones['hips']['mch_drv']
-        back_mch_drv_names = all_bones['back']['mch_drv_bones']
-        neck_mch_drv_names = all_bones['neck']['mch_drv_bones']
-        head_mch_drv_name  = all_bones['head']['mch_drv']
-        
-        mch_drv_bones = [ hips_mch_drv_name ] + back_mch_drv_names + neck_mch_drv_names + [ head_mch_drv_name ]
-        
-        # MCH bone names (4)
-        hips_mch_name  = all_bones['hips']['mch']
-        back_mch_names = all_bones['back']['mch_bones']
-        neck_mch_names = all_bones['neck']['mch_bones']
-        
-        mch_bones = [ hips_mch_name ] + back_mch_names + neck_mch_names
-        
-        # Deformation bone names (5)
+        # Deformation bone names (1)
         def_bones = all_bones['def']['def_bones']
-        
-        # referencing all subtarget bones
-        torso_name      = all_bones['torso']['ctrl']
-        spine_ctrl_name = all_bones['back']['spine_ctrl']
-        ribs_ctrl_name  = all_bones['back']['ribs_ctrl']
-        neck_ctrl_name  = all_bones['neck']['ctrl']
-        head_ctrl_name  = all_bones['head']['ctrl']
-        
-        hips_tweak_name  = all_bones['hips']['tweak']
-        back_tweak_names = all_bones['back']['tweak_bones']
-        neck_tweak_names = all_bones['neck']['tweak_bones']
-        
-        fk_bones = all_bones['fk']['fk_bones']
-        
-        ### Build contraint data dictionary
-        ## MCH Rotation constraints (1)
-        subtarget_ctrl_bones    = [ spine_ctrl_name, ribs_ctrl_name, neck_ctrl_name ] 
-        subtarget_mch_rot_bones = [ ribs_mch_rot_names[1], neck_mch_rot_names[1], head_mch_rot_names[1] ]
-        
-        # Copy_Loc and Copy_Rot for all bones:
-        for bone, subtarget_ctrl, subtarget_mch_rot in zip( owner_mch_rot_bones, subtarget_ctrl_bones, subtarget_mch_rot_bones ):
-            constraint_data[bone] = [ { 'constraint': 'COPY_LOCATION',
-                                        'subtarget' : subtarget_ctrl,
-                                        'head_tail' : 1.0               },
-                                      { 'constraint': 'COPY_ROTATION', 
-                                        'subtarget' : subtarget_mch_rot },
-                                      { 'constraint': 'COPY_SCALE',
-                                        'subtarget' : torso_name        }                    
-                                    ]
-        
-        ## MCH Stretch constraints (2)
-        subtarget_bones = [ ribs_ctrl_name, head_ctrl_name ]
-        
-        for bone, subtarget in zip( mch_str_bones, subtarget_bones ):
-            constraint_data[bone] = [ { 'constraint' : 'DAMPED_TRACK',
-                                       'subtarget'  : subtarget       },
-                                     { 'constraint' : 'STRETCH_TO',
-                                       'subtarget'  : subtarget       } 
-                                   ]
-            
-            if mch_str_bones.index(bone) == 0:
-                constraint_data[bone][0]['head_tail'] = 1.0
-                constraint_data[bone][1]['head_tail'] = 1.0
-        
-        ## MCH DRV constraints (3)
-        # Initializing constraints data stack
-        for bone in mch_drv_bones:
-            constraint_data[bone] = [ ]
-        
-        # back curve (linear falloff)
-        subtarget = back_mch_str_name
-        factor = 1 / len(back_mch_drv_names)
-        
-        for bone in back_mch_drv_names[1:-1]:
-            #if back_mch_drv_names.index(bone) != 0:
-            head_tail = back_mch_drv_names.index(bone) * factor
-            influence = 1.0 - head_tail
-            constraint_data[bone].append( { 'constraint' : 'COPY_TRANSFORMS',
-                                            'subtarget'  : subtarget,
-                                            'head_tail'  : head_tail,
-                                            'influence'  : influence          } )
-        
-        # extending the last back mch drv transforms
-        subtarget = ribs_ctrl_name
-        constraint_data[back_mch_drv_names[-1]].extend( [ { 'constraint' : 'COPY_ROTATION',
-                                                            'subtarget'  : subtarget        },
-                                                          { 'constraint' : 'COPY_SCALE',
-                                                            'subtarget'  : subtarget        } ] )
-        
-        # neck following head rotation (linear falloff)
-        subtarget = head_ctrl_name
-        factor = 1 / len(neck_mch_drv_names)
-        
-        i = 1
-        for bone in neck_mch_drv_names:
-            if neck_mch_drv_names.index(bone) != 0:
-                influence = float(i * factor)
-                constraint_data[bone].append( { 'constraint' : 'COPY_ROTATION',
-                                                'subtarget'  : subtarget,
-                                                'influence'  : influence       } )
-                i += 1
 
-        # head mch drv following the head control
-        subtarget = head_ctrl_name
-        constraint_data[head_mch_drv_name].append( { 'constraint' : 'COPY_TRANSFORMS',
-                                                     'subtarget'  : subtarget          } )
+        # Referencing def subtargets: tweak bones + head control
+        hips_tweak  = all_bones['hips']['tweak']
+        back_tweaks = all_bones['back']['tweak_bones']
+        neck_tweaks = all_bones['neck']['tweak_bones']
+        head_ctrl   = all_bones['head']['ctrl']
+
+        def_bones_subtargets = \
+            [hips_tweak] + back_tweaks + neck_tweaks + [head_ctrl]
+
+        for bone, subtarget in zip( def_bones, def_bones_subtargets ):
+            if def_bones.index( bone ) != def_bones.index( def_bones[-1] ):
+                next_index     = def_bones.index( bone ) + 1
+                next_subtarget = def_bones[ next_index ]
+                
+                constraint_data[ bone ] = [ 
+                    { 'constraint': 'COPY_TRANSFORMS',
+                      'subtarget' : subtarget        },
+                    { 'constraint': 'DAMPED_TRACK', 
+                      'subtarget' : next_subtarget   },
+                    { 'constraint': 'STRETCH_TO',
+                      'subtarget' : next_subtarget   } 
+                ]
+
+            else:
+                constraint_data[ bone ] = [ 
+                    { 'constraint': 'COPY_TRANSFORMS',
+                      'subtarget' : subtarget        }
+                ]
         
-        # fk switch constraints
-        for bone, subtarget in zip( mch_drv_bones, fk_bones ):
-            constraint_data[bone].append( { 'constraint' : 'COPY_TRANSFORMS',
-                                            'subtarget'  : subtarget          } )
-            
-        ## MCH constraints (4)
-        subtarget_bones = back_tweak_names + neck_tweak_names + [ head_mch_drv_name ]
+        # MCH Rotation bone names (2)
+        neck_mch_rot = all_bones['neck']['mch_rot']
+        head_mch_rot = all_bones['head']['mch_rot']
+
+        # MCH rot subtargets:
+        ribs_ctrl = all_bones['back']['ribs_ctrl']
+        neck_ctrl = all_bones['neck']['ctrl']
+
+        for bone, subtarget in zip( 
+            [ neck_mch_rot, head_mch_rot ], [ ribs_ctrl, neck_ctrl ] ):
         
-        for bone, subtarget in zip( mch_bones, subtarget_bones ):
-            constraint_data[bone] = [ { 'constraint' : 'DAMPED_TRACK',
-                                        'subtarget'  : subtarget       },
-                                      { 'constraint' : 'STRETCH_TO',
-                                        'subtarget'  : subtarget       } 
-                                    ]
+            constraint_data[ bone ] = [ 
+                { 'constraint': 'COPY_LOCATION',
+                  'subtarget' : subtarget,
+                  'head_tail' : 1.0              },
+                { 'constraint': 'COPY_ROTATION', 
+                  'subtarget' : subtarget        }
+            ]
+
+        # MCH DRV bone names (3)
+        back_mch_drvs = all_bones['back']['mch_drv_bones']
         
-        ## Deformation constraints (5)
-        subtarget_bones = mch_bones + [ head_mch_drv_name ]
-        
-        for bone, subtarget in zip( def_bones, subtarget_bones ):
-            constraint_data[bone] = [ { 'constraint' : 'COPY_TRANSFORMS',
-                                        'subtarget'  : subtarget          } ]
+        constraint_data[ back_mch_drvs[0] ] = [ 
+            { 'constraint': 'DAMPED_TRACK',
+              'subtarget' : back_tweaks[1]  }       
+        ]
+
+        constraint_data[ back_mch_drvs[1] ] = [ 
+            { 'constraint'  : 'COPY_TRANSFORMS',
+              'subtarget'   : ribs_ctrl,
+              'influence'   : 0.5
+              'ownerspace'  : 'LOCAL'
+              'targetspace' : 'LOCAL'            },
+            { 'constraint'  : 'DAMPED_TRACK', 
+              'subtarget'   : back_tweaks[1]     }
+        ]
+
+        neck_mch_drv  = all_bones['neck']['mch_drv']
+
+        constraint_data[ neck_mch_drv ] = [ 
+            { 'constraint'  : 'COPY_TRANSFORMS',
+              'subtarget'   : all_bones['head']['mch_drv'],
+              'influence'   : 0.5
+              'ownerspace'  : 'LOCAL'
+              'targetspace' : 'LOCAL'                       }
+        ]
+
+        head_mch_drv  = all_bones['head']['mch_drv']
+
+        constraint_data[ head_mch_drv ] = [
+            { 'constraint': 'COPY_LOCATION',
+              'subtarget' : head_ctrl,       }
+        ]
         
         return constraint_data
 
 
     def set_constraints( self, constraint_data ):
-        for bone in constraint_data.keys():
+        for bone in constraint_data:
             for constraint in constraint_data[bone]:
                 self.make_constraint(bone, constraint)
 
@@ -661,6 +529,15 @@ class Rig:
         except:
             pass
 
+        try:
+            const.owner_space = constraint['ownerspace']
+        except:
+            pass
+
+        try:
+            const.target_space = constraint['targetspace']
+        except:
+            pass
 
     def drivers_and_props( self, all_bones ):
         
@@ -671,11 +548,10 @@ class Rig:
         torso_name = all_bones['torso']['ctrl']
         pb_torso = pb[torso_name]
         
-        ribs_mch_rot_names = all_bones['back']['mch_rot_bones']
-        neck_mch_rot_names = all_bones['neck']['mch_rot_bones']
-        head_mch_rot_names = all_bones['head']['mch_rot_bones']
+        neck_mch_rot = all_bones['neck']['mch_rot']
+        head_mch_rot = all_bones['head']['mch_rot']
         
-        owner_mch_rot_bones = [ ribs_mch_rot_names[0], neck_mch_rot_names[0], head_mch_rot_names[0] ]
+        owner_mch_rot_bones = [ neck_mch_rot, head_mch_rot ]
         
         hips_mch_drv_name  = all_bones['hips']['mch_drv']
         back_mch_drv_names = all_bones['back']['mch_drv_bones']
@@ -685,7 +561,7 @@ class Rig:
         mch_drv_bones = [ hips_mch_drv_name ] + back_mch_drv_names + neck_mch_drv_names + [ head_mch_drv_name ]
         
         # Setting the torso's props
-        props_list = [ "ribs_follow", "neck_follow", "head_follow", "IK/FK" ]
+        props_list = [ "neck_follow", "head_follow" ]
         
         for prop in props_list:
             
@@ -701,8 +577,8 @@ class Rig:
             prop["soft_max"] = 1.0
             prop["description"] = prop
         
-        # driving the follow rotation switches for ribs neck and head
-        for bone, prop, in zip( owner_mch_rot_bones, props_list[:-1] ):
+        # driving the follow rotation switches for neck and head
+        for bone, prop, in zip( owner_mch_rot_bones, props_list ):
             drv = pb[ bone ].constraints[ 1 ].driver_add("influence").driver
             drv.type='SUM'
             
@@ -712,17 +588,6 @@ class Rig:
             var.targets[0].id = self.obj
             var.targets[0].data_path = pb_torso.path_from_id() + '['+ '"' + prop + '"' + ']'
         
-        # driving the fk switch
-        for bone in mch_drv_bones:
-            drv = pb[ bone ].constraints[ -1 ].driver_add("influence").driver
-            drv.type='SUM'
-            
-            var = drv.variables.new()
-            var.name = "fk_switch"
-            var.type = "SINGLE_PROP"
-            var.targets[0].id = self.obj
-            var.targets[0].data_path = pb_torso.path_from_id() + '["IK/FK"]'
-
 
     def bone_properties( self, all_bones ):
         ## Setting all the properties of the bones relevant to posemode
@@ -761,20 +626,22 @@ class Rig:
         torso_name      = all_bones['torso']['ctrl']
         
         hips_ctrl_name  = all_bones['hips']['ctrl']
-        spine_ctrl_name = all_bones['back']['spine_ctrl']
         ribs_ctrl_name  = all_bones['back']['ribs_ctrl']
         neck_ctrl_name  = all_bones['neck']['ctrl']
         head_ctrl_name  = all_bones['head']['ctrl']
         
-        control_names = [ hips_ctrl_name, spine_ctrl_name, ribs_ctrl_name, neck_ctrl_name, head_ctrl_name ]
+        control_names = [ 
+            hips_ctrl_name, 
+            ribs_ctrl_name, 
+            neck_ctrl_name, 
+            head_ctrl_name 
+        ]
         
         hips_tweak_name  = all_bones['hips']['tweak']
         back_tweak_names = all_bones['back']['tweak_bones']
         neck_tweak_names = all_bones['neck']['tweak_bones']
         
         tweak_names = [ hips_tweak_name ] + back_tweak_names + neck_tweak_names
-        
-        fk_names = all_bones['fk']['fk_bones']
         
         # Assigning a widget to torso bone
         create_cube_widget(self.obj, torso_name, radius=0.5, bone_transform_name=None)
@@ -790,13 +657,6 @@ class Rig:
             if self.tweak_layers:
                 pb[bone].bone.layers = self.tweak_layers
         
-        # Assigning widgets to fk bones and layers
-        for bone in fk_names:
-            create_circle_widget(self.obj, bone, radius=1.0, head_tail=0.5, with_line=False, bone_transform_name=None)
-            
-            if self.fk_layers:
-                pb[bone].bone.layers = self.fk_layers
-
         all_controls = [ torso_name ] + control_names + tweak_names + fk_names
 
         return all_controls
@@ -812,7 +672,6 @@ class Rig:
         all_controls = self.assign_widgets( all_bones )
 
         torso_name      = all_bones['torso']['ctrl']
-        ribs_ctrl_name  = all_bones['back']['ribs_ctrl']
         neck_ctrl_name  = all_bones['neck']['ctrl']
         head_ctrl_name  = all_bones['head']['ctrl']
 
@@ -822,19 +681,15 @@ class Rig:
             controls_string, 
             head_ctrl_name, 
             neck_ctrl_name, 
-            ribs_ctrl_name, 
             self.obj.name, 
             torso_name, 
-            'IK/FK',        # All controls display this prop
             'head_follow',  # Only head (and torso) displays this prop
             'neck_follow',  # Only neck (and torso) displays this prop
-            'ribs_follow',  # Only ribs (and torso) displays this prop
             'head_follow',  #
             'neck_follow',  # These three also appear on torso
-            'ribs_follow'   #
             )]
 
-def add_parameters(params):
+def add_parameters( params ):
     """ Add the parameters of this rig type to the
         RigifyParameters PropertyGroup
     """
@@ -845,26 +700,17 @@ def add_parameters(params):
         description="The name of the torso master control bone"
         )
 
-    #Setting up extra layers for the FK and tweak
+    # Setting up extra layers for the FK and tweak
     params.tweak_extra_layers = bpy.props.BoolProperty( 
         name        = "tweak_extra_layers", 
         default     = True, 
         description = ""
         )
+
     params.tweak_layers = bpy.props.BoolVectorProperty(
         size        = 32,
         description = "Layers for the tweak controls to be on",
         default     = tuple( [ i == 1 for i in range(0, 32) ] )
-        )
-    params.fk_extra_layers = bpy.props.BoolProperty(
-        name        = "fk_extra_layers",
-        default     = True, 
-        description = ""
-        )
-    params.fk_layers = bpy.props.BoolVectorProperty(
-        size        = 32,
-        description = "Layers for the FK controls to be on",
-        default     = tuple( [ i == 2 for i in range(0, 32) ] )
         )
 
 
@@ -917,53 +763,3 @@ def parameters_ui(layout, params):
     row.prop(params, "tweak_layers", index=29, toggle=True, text="")
     row.prop(params, "tweak_layers", index=30, toggle=True, text="")
     row.prop(params, "tweak_layers", index=31, toggle=True, text="")
-    
-    r = layout.row()
-    r.prop(params, "fk_extra_layers")
-    r.active = params.fk_extra_layers
-    
-    col = r.column(align=True)
-    row = col.row(align=True)
-    row.prop(params, "fk_layers", index=0, toggle=True, text="")
-    row.prop(params, "fk_layers", index=1, toggle=True, text="")
-    row.prop(params, "fk_layers", index=2, toggle=True, text="")
-    row.prop(params, "fk_layers", index=3, toggle=True, text="")
-    row.prop(params, "fk_layers", index=4, toggle=True, text="")
-    row.prop(params, "fk_layers", index=5, toggle=True, text="")
-    row.prop(params, "fk_layers", index=6, toggle=True, text="")
-    row.prop(params, "fk_layers", index=7, toggle=True, text="")
-    row = col.row(align=True)
-    row.prop(params, "fk_layers", index=16, toggle=True, text="")
-    row.prop(params, "fk_layers", index=17, toggle=True, text="")
-    row.prop(params, "fk_layers", index=18, toggle=True, text="")
-    row.prop(params, "fk_layers", index=19, toggle=True, text="")
-    row.prop(params, "fk_layers", index=20, toggle=True, text="")
-    row.prop(params, "fk_layers", index=21, toggle=True, text="")
-    row.prop(params, "fk_layers", index=22, toggle=True, text="")
-    row.prop(params, "fk_layers", index=23, toggle=True, text="")
-    
-    col = r.column(align=True)
-    row = col.row(align=True)
-    row.prop(params, "fk_layers", index=8, toggle=True, text="")
-    row.prop(params, "fk_layers", index=9, toggle=True, text="")
-    row.prop(params, "fk_layers", index=10, toggle=True, text="")
-    row.prop(params, "fk_layers", index=11, toggle=True, text="")
-    row.prop(params, "fk_layers", index=12, toggle=True, text="")
-    row.prop(params, "fk_layers", index=13, toggle=True, text="")
-    row.prop(params, "fk_layers", index=14, toggle=True, text="")
-    row.prop(params, "fk_layers", index=15, toggle=True, text="")
-    row = col.row(align=True)
-    row.prop(params, "fk_layers", index=24, toggle=True, text="")
-    row.prop(params, "fk_layers", index=25, toggle=True, text="")
-    row.prop(params, "fk_layers", index=26, toggle=True, text="")
-    row.prop(params, "fk_layers", index=27, toggle=True, text="")
-    row.prop(params, "fk_layers", index=28, toggle=True, text="")
-    row.prop(params, "fk_layers", index=29, toggle=True, text="")
-    row.prop(params, "fk_layers", index=30, toggle=True, text="")
-    row.prop(params, "fk_layers", index=31, toggle=True, text="")
-    
-    """
-    r = layout.row()
-    r.label(text="Make thumb")
-    r.prop(params, "thumb", text="")
-    """
