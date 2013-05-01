@@ -119,7 +119,7 @@ class Rig:
         # change the rotation pivot
         org_ribs_2_e = eb[ back_org_bones[1] ]
         ribs_ctrl_bone_e.head[:] = \
-            org_ribs_2_e.tail - ( org_ribs_2_e.head + org_ribs_2_e.tail ) / 3
+            org_ribs_2_e.tail - ( org_ribs_2_e.tail - org_ribs_2_e.head ) / 3
         
         # Create mch_drv bone
         mch_drv_bones = []        
@@ -184,17 +184,14 @@ class Rig:
         mch_rotation_name = make_mechanism_name( ctrl_name ) + '_rotation'
         mch_rotation_name = copy_bone(
             self.obj, 
-            org_bones[ 'ORG-ribs.001' ], 
+            'ribs', 
             mch_rotation_name 
         )
 
         mch_rot_e = eb[ mch_rotation_name ]
-        tail_vect = Vector( 
-            [ mch_rot_e.tail.x, mch_rot_e.tail.y, mch_rot_e.tail.z ]
-        )
         
         # Position and scale mch rotation bone
-        put_bone( obj, mch_rotation_name, eb[ neck_org_bones[0] ].head )
+        put_bone( self.obj, mch_rotation_name, eb[ neck_org_bones[0] ].head )
         mch_rot_e.length /= 3
 
         # Create mch drv bone
@@ -208,7 +205,7 @@ class Rig:
             # Create tweak bones
             tweak_name   = copy_bone( self.obj, org, ctrl_name )
             tweak_bone_e = eb[ tweak_name ]
-            tweak_bone_e.length \= 2
+            tweak_bone_e.length /= 2
             
             tweak_bones.append( tweak_name )
             
@@ -236,12 +233,13 @@ class Rig:
         mch_rotation_name = make_mechanism_name( ctrl_name ) + '_rotation'
         mch_rotation_name = copy_bone( 
             self.obj, 
-            org_bones[-1], 
+            'neck', 
             mch_rotation_name 
         )
 
-        # Scale mch rotation bone to a third of its size
+        # Position and scale mch rotation bone
         mch_rot_e = eb[ mch_rotation_name ]
+        put_bone( self.obj, mch_rotation_name, eb[ org_bones[-1] ].head )
         mch_rot_e.length /= 3
         
         # Create mch drv bone
@@ -326,8 +324,8 @@ class Rig:
         torso_ctrl_e.parent = None  # Later rigify will parent to root
         
         # Parenting the hips' bones
-        hips_name          = all_bones['hips']['ctrl']        
-        hips_ctrl_e        = eb[hips_ctrl_name]        
+        hips_ctrl          = all_bones['hips']['ctrl']        
+        hips_ctrl_e        = eb[ hips_ctrl ]        
         hips_ctrl_e.parent = torso_ctrl_e
 
         hips_tweak_name     = all_bones['hips']['tweak']
@@ -426,7 +424,7 @@ class Rig:
         for bone, subtarget in zip( def_bones, def_bones_subtargets ):
             if def_bones.index( bone ) != def_bones.index( def_bones[-1] ):
                 next_index     = def_bones.index( bone ) + 1
-                next_subtarget = def_bones[ next_index ]
+                next_subtarget = def_bones_subtargets[ next_index ]
                 
                 constraint_data[ bone ] = [ 
                     { 'constraint': 'COPY_TRANSFORMS',
@@ -473,11 +471,11 @@ class Rig:
         constraint_data[ back_mch_drvs[1] ] = [ 
             { 'constraint'  : 'COPY_TRANSFORMS',
               'subtarget'   : ribs_ctrl,
-              'influence'   : 0.5
-              'ownerspace'  : 'LOCAL'
+              'influence'   : 0.5,
+              'ownerspace'  : 'LOCAL',
               'targetspace' : 'LOCAL'            },
             { 'constraint'  : 'DAMPED_TRACK', 
-              'subtarget'   : back_tweaks[1]     }
+              'subtarget'   : back_tweaks[2]     }
         ]
 
         neck_mch_drv  = all_bones['neck']['mch_drv']
@@ -485,8 +483,8 @@ class Rig:
         constraint_data[ neck_mch_drv ] = [ 
             { 'constraint'  : 'COPY_TRANSFORMS',
               'subtarget'   : all_bones['head']['mch_drv'],
-              'influence'   : 0.5
-              'ownerspace'  : 'LOCAL'
+              'influence'   : 0.5,
+              'ownerspace'  : 'LOCAL',
               'targetspace' : 'LOCAL'                       }
         ]
 
@@ -552,14 +550,6 @@ class Rig:
         head_mch_rot = all_bones['head']['mch_rot']
         
         owner_mch_rot_bones = [ neck_mch_rot, head_mch_rot ]
-        
-        hips_mch_drv  = all_bones['hips']['mch_drv']
-        back_mch_drvs = all_bones['back']['mch_drv_bones']
-        neck_mch_drvs = all_bones['neck']['mch_drv_bones']
-        head_mch_drv  = all_bones['head']['mch_drv']
-        
-        mch_drv_bones = \
-            [ hips_mch_drv ] + back_mch_drvs + neck_mch_drvs + [ head_mch_drv ]
         
         # Setting the torso's props
         props_list = [ "neck_follow", "head_follow" ]
@@ -671,7 +661,7 @@ class Rig:
             if self.tweak_layers:
                 pb[bone].bone.layers = self.tweak_layers
         
-        all_controls = [ torso_name ] + control_names + tweak_names + fk_names
+        all_controls = [ torso_name ] + control_names + tweak_names
 
         return all_controls
 
@@ -697,10 +687,8 @@ class Rig:
             neck_ctrl_name, 
             self.obj.name, 
             torso_name, 
-            'head_follow',  # Only head (and torso) displays this prop
-            'neck_follow',  # Only neck (and torso) displays this prop
-            'head_follow',  #
-            'neck_follow',  # These three also appear on torso
+            'head_follow',
+            'neck_follow'
             )]
 
 def add_parameters( params ):
@@ -777,3 +765,138 @@ def parameters_ui(layout, params):
     row.prop(params, "tweak_layers", index=29, toggle=True, text="")
     row.prop(params, "tweak_layers", index=30, toggle=True, text="")
     row.prop(params, "tweak_layers", index=31, toggle=True, text="")
+
+
+def create_sample(obj):
+    # generated by rigify.utils.write_metarig
+    bpy.ops.object.mode_set(mode='EDIT')
+    arm = obj.data
+
+    bones = {}
+
+    bone = arm.edit_bones.new('hips')
+    bone.head[:] = 0.0000, 0.0351, 1.0742
+    bone.tail[:] = -0.0000, 0.0059, 1.1910
+    bone.roll = 0.0000
+    bone.use_connect = False
+    bones['hips'] = bone.name
+    bone = arm.edit_bones.new('spine')
+    bone.head[:] = -0.0000, 0.0059, 1.1910
+    bone.tail[:] = 0.0000, 0.0065, 1.2768
+    bone.roll = 0.0000
+    bone.use_connect = True
+    bone.parent = arm.edit_bones[bones['hips']]
+    bones['spine'] = bone.name
+    bone = arm.edit_bones.new('ribs')
+    bone.head[:] = 0.0000, 0.0065, 1.2768
+    bone.tail[:] = -0.0000, 0.0251, 1.3655
+    bone.roll = 0.0000
+    bone.use_connect = True
+    bone.parent = arm.edit_bones[bones['spine']]
+    bones['ribs'] = bone.name
+    bone = arm.edit_bones.new('ribs.001')
+    bone.head[:] = -0.0000, 0.0251, 1.3655
+    bone.tail[:] = 0.0000, 0.0217, 1.4483
+    bone.roll = 0.0000
+    bone.use_connect = True
+    bone.parent = arm.edit_bones[bones['ribs']]
+    bones['ribs.001'] = bone.name
+    bone = arm.edit_bones.new('neck')
+    bone.head[:] = 0.0000, 0.0217, 1.4483
+    bone.tail[:] = 0.0000, 0.0092, 1.4975
+    bone.roll = 0.0000
+    bone.use_connect = True
+    bone.parent = arm.edit_bones[bones['ribs.001']]
+    bones['neck'] = bone.name
+    bone = arm.edit_bones.new('neck.001')
+    bone.head[:] = 0.0000, 0.0092, 1.4975
+    bone.tail[:] = -0.0000, -0.0013, 1.5437
+    bone.roll = -0.0000
+    bone.use_connect = True
+    bone.parent = arm.edit_bones[bones['neck']]
+    bones['neck.001'] = bone.name
+    bone = arm.edit_bones.new('head')
+    bone.head[:] = -0.0000, -0.0013, 1.5437
+    bone.tail[:] = -0.0000, -0.0013, 1.7037
+    bone.roll = 0.0000
+    bone.use_connect = True
+    bone.parent = arm.edit_bones[bones['neck.001']]
+    bones['head'] = bone.name
+
+    bpy.ops.object.mode_set(mode='OBJECT')
+    pbone = obj.pose.bones[bones['hips']]
+    pbone.rigify_type = 'pitchipoy.turbo_torso'
+    pbone.lock_location = (False, False, False)
+    pbone.lock_rotation = (False, False, False)
+    pbone.lock_rotation_w = False
+    pbone.lock_scale = (False, False, False)
+    pbone.rotation_mode = 'QUATERNION'
+    try:
+        pbone.rigify_parameters.extra_layers = [False, True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
+    except AttributeError:
+        pass
+    try:
+        pbone.rigify_parameters.tweak_layers = [False, False, False, True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
+    except AttributeError:
+        pass
+    try:
+        pbone.rigify_parameters.fk_layers = [False, False, False, True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
+    except AttributeError:
+        pass
+    pbone = obj.pose.bones[bones['spine']]
+    pbone.rigify_type = ''
+    pbone.lock_location = (False, False, False)
+    pbone.lock_rotation = (False, False, False)
+    pbone.lock_rotation_w = False
+    pbone.lock_scale = (False, False, False)
+    pbone.rotation_mode = 'QUATERNION'
+    pbone = obj.pose.bones[bones['ribs']]
+    pbone.rigify_type = ''
+    pbone.lock_location = (False, False, False)
+    pbone.lock_rotation = (False, False, False)
+    pbone.lock_rotation_w = False
+    pbone.lock_scale = (False, False, False)
+    pbone.rotation_mode = 'QUATERNION'
+    pbone = obj.pose.bones[bones['ribs.001']]
+    pbone.rigify_type = ''
+    pbone.lock_location = (False, False, False)
+    pbone.lock_rotation = (False, False, False)
+    pbone.lock_rotation_w = False
+    pbone.lock_scale = (False, False, False)
+    pbone.rotation_mode = 'QUATERNION'
+    pbone = obj.pose.bones[bones['neck']]
+    pbone.rigify_type = ''
+    pbone.lock_location = (False, False, False)
+    pbone.lock_rotation = (False, False, False)
+    pbone.lock_rotation_w = False
+    pbone.lock_scale = (False, False, False)
+    pbone.rotation_mode = 'QUATERNION'
+    pbone = obj.pose.bones[bones['neck.001']]
+    pbone.rigify_type = ''
+    pbone.lock_location = (False, False, False)
+    pbone.lock_rotation = (False, False, False)
+    pbone.lock_rotation_w = False
+    pbone.lock_scale = (False, False, False)
+    pbone.rotation_mode = 'QUATERNION'
+    pbone = obj.pose.bones[bones['head']]
+    pbone.rigify_type = ''
+    pbone.lock_location = (False, False, False)
+    pbone.lock_rotation = (False, False, False)
+    pbone.lock_rotation_w = False
+    pbone.lock_scale = (False, False, False)
+    pbone.rotation_mode = 'QUATERNION'
+
+    bpy.ops.object.mode_set(mode='EDIT')
+    for bone in arm.edit_bones:
+        bone.select = False
+        bone.select_head = False
+        bone.select_tail = False
+    for b in bones:
+        bone = arm.edit_bones[bones[b]]
+        bone.select = True
+        bone.select_head = True
+        bone.select_tail = True
+        arm.edit_bones.active = bone
+
+if __name__ == "__main__":
+    create_sample(bpy.context.active_object) 
