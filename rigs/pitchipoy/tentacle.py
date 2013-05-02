@@ -1,7 +1,7 @@
 import bpy
 from ...utils import copy_bone
 from ...utils import strip_org, make_deformer_name, connected_children_names
-from ...utils import create_circle_widget
+from ...utils import create_circle_widget, create_sphere_widget
 from ...utils import MetarigError
 
 class Rig:
@@ -22,7 +22,18 @@ class Rig:
         
 
     def make_master( self ):
-        pass
+        bpy.ops.object.mode_set(mode ='EDIT')
+
+        org_bones = self.org_bones
+        
+        master_bone  = copy_bone(
+            self.obj, 
+            org_bones[0], 
+            strip_org(name) + "_master"
+        )        
+
+        # Make widgets
+        bpy.ops.object.mode_set(mode ='OBJECT')        
 
         
     def make_controls( self ):
@@ -52,7 +63,52 @@ class Rig:
 
 
     def make_tweaks( self ):
-        pass    
+        bpy.ops.object.mode_set(mode ='EDIT')
+
+        org_bones = self.org_bones
+
+        tweak_chain = []
+        for i in range( len( org_bones ) + 1 ):
+            if i == len( org_bones ):
+                # Make final tweak at the tip of the tentacle
+                name = org_bones[i-1]
+            else:
+                name = org_bones[i]
+
+            tweak_bone = copy_bone(
+                self.obj, 
+                name, 
+                strip_org(name) + "_tweak"
+            )
+
+            tweak_e = self.obj.data.bones[ tweak_bone ]
+            
+            tweak_e.length /= 2 # Set size to half
+            
+            if i == len( org_bones ):
+                # Position final tweak at the tip
+                put_bone( self.obj, tweak_bone, eb[ tweak_chain[i-1].head )
+        
+            tweak_chain.append( tweak_bone )
+
+        # Make widgets
+        bpy.ops.object.mode_set(mode = 'OBJECT')
+
+        for tweak in tweak_chain:
+            create_sphere_widget( self.obj, tweak )
+
+            tweak_pb = self.obj.pose.bones[ tweak ]
+
+            # Set locks
+            if tweak_chain.index( tweak ) != len( tweak_chain ) - 1:
+                tweak_pb.lock_rotation = (True, False, True)
+                tweak_pb.lock_scale    = (False, True, False)
+            else:
+                tweak_pb.lock_rotation_w = True
+                tweak_pb.lock_rotation   = (True, True, True)
+                tweak_pb.lock_scale      = (True, True, True)
+            
+        return tweak_chain   
 
 
     def make_deform( self ):
@@ -190,3 +246,26 @@ def parameters_ui(layout, params):
     r.prop(params, "make_stretch")
     r = layout.row()
     r.prop(params, "make_rotations")
+
+
+def create_square_widget(rig, bone_name, size=1.0, bone_transform_name=None):
+    obj = create_widget(rig, bone_name, bone_transform_name)
+    if obj != None:
+        verts = [
+            (  0.5 * size, -2.9802322387695312e-08 * size,  0.5 * size ), 
+            ( -0.5 * size, -2.9802322387695312e-08 * size,  0.5 * size ), 
+            (  0.5 * size,  2.9802322387695312e-08 * size, -0.5 * size ), 
+            ( -0.5 * size,  2.9802322387695312e-08 * size, -0.5 * size ), 
+        ]
+
+        edges = [(0, 1), (2, 3), (0, 2), (3, 1) ]
+        faces = []
+
+        mesh = obj.data
+        mesh.from_pydata(verts, edges, faces)
+        mesh.update()
+        mesh.update()
+        return obj
+    else:
+        return None
+
