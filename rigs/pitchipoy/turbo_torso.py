@@ -482,7 +482,7 @@ class Rig:
 
         constraint_data[ neck_mch_drv ] = [ 
             { 'constraint'  : 'COPY_TRANSFORMS',
-              'subtarget'   : all_bones['head']['mch_drv'],
+              'subtarget'   : head_ctrl,
               'influence'   : 0.5,
               'ownerspace'  : 'LOCAL',
               'targetspace' : 'LOCAL'                       }
