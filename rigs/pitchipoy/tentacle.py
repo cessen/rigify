@@ -1,8 +1,10 @@
 import bpy
-from ...utils import copy_bone
-from ...utils import strip_org, make_deformer_name, connected_children_names
-from ...utils import create_circle_widget, create_sphere_widget
-from ...utils import MetarigError
+from ...utils    import copy_bone
+from ...utils    import strip_org, make_deformer_name, connected_children_names
+from ...utils    import make_mechanism_name, put_bone, create_sphere_widget
+from ...utils    import create_widget, create_circle_widget
+from ...utils    import MetarigError
+from rna_prop_ui import rna_idprop_ui_prop_get
 
 class Rig:
     
@@ -26,17 +28,25 @@ class Rig:
         bpy.ops.object.mode_set(mode ='EDIT')
 
         org_bones  = self.org_bones
-        mch_parent = self.object.data.bones[ org_bones[0] ].parent
+        mch_parent = self.obj.data.bones[ org_bones[0] ].parent
         
-        mch_bone = copy_bone(
-            self.obj, 
-            mch_parent.name,
-            make_mechanism_name( strip_org( org_bones[0] ) )
-        )
-        
-        mch_e = self.obj.data.bones[ mch_bone ] # reference edit bone
-        put_bone( self.obj, mch_bone, mch_parent.head )
-        
+        if not mch_parent:
+            mch_parent = self.obj.data.edit_bones[ org_bones[0] ]
+            mch_bone = copy_bone(
+                self.obj, 
+                mch_parent.name,
+                make_mechanism_name( strip_org( org_bones[0] ) )
+            )
+        else:
+            mch_bone = copy_bone(
+                self.obj, 
+                mch_parent.name,
+                make_mechanism_name( strip_org( org_bones[0] ) )
+            )  
+
+            put_bone( self.obj, mch_bone, mch_parent.tail )
+
+        mch_e = self.obj.data.edit_bones[ mch_bone ] # reference edit bone
         mch_e.length /= 4 # reduce length to fourth of original
         
         return mch_bone
@@ -57,6 +67,8 @@ class Rig:
         bpy.ops.object.mode_set(mode ='OBJECT')        
 
         create_square_widget( self.obj, master_bone )
+        
+        return master_bone
 
         
     def make_controls( self ):
@@ -87,7 +99,7 @@ class Rig:
 
     def make_tweaks( self ):
         bpy.ops.object.mode_set(mode ='EDIT')
-
+        eb = self.obj.data.edit_bones
         org_bones = self.org_bones
 
         tweak_chain = []
@@ -104,13 +116,13 @@ class Rig:
                 strip_org(name) + "_tweak"
             )
 
-            tweak_e = self.obj.data.bones[ tweak_bone ]
+            tweak_e = eb[ tweak_bone ]
             
             tweak_e.length /= 2 # Set size to half
             
             if i == len( org_bones ):
                 # Position final tweak at the tip
-                put_bone( self.obj, tweak_bone, eb[ tweak_chain[i-1].head )
+                put_bone( self.obj, tweak_bone, eb[ org_bones[-1]].tail )
         
             tweak_chain.append( tweak_bone )
 
@@ -160,16 +172,18 @@ class Rig:
 
     def parent_bones( self, all_bones ):
         bpy.ops.object.mode_set(mode ='EDIT')
-        eb = self.obj.data.bones
 
-        # Clear all initial parenting
-        for category in all_bones:
-            for bones in all_bones[category]:
-                if isinstance( all_bones[category][bones], list ):
-                    for bone in all_bones[category][bones]:
-                        eb[bone].parent = None
-                else:
-                    eb[ all_bones[category][bones] ].parent = None
+        org_bones = self.org_bones
+        eb        = self.obj.data.edit_bones
+
+        """ for category in all_bones:
+            if isinstance( all_bones[category], list ):
+                for bone in all_bones[category]:
+                    print( "Bone: " + bone )
+                    eb[bone].parent = None
+            else:
+                eb[ all_bones[category] ].parent = None
+        """
 
         # mch bone remains parentless and will be parented to root by rigify
 
@@ -177,11 +191,11 @@ class Rig:
         eb[ all_bones['master'] ].parent = eb[ all_bones['mch'] ]
 
         # Parent control bones
-        ctrls_n_parent = [all_bones['master']] + all_bones['control']
+        ctrls_n_parent = [ all_bones['master'] ] + all_bones['control']
 
         for bone in ctrls_n_parent[1:]:
-            previous_index    = all_bones['control'].index( bone ) - 1
-            eb[ bone ].parent = eb[all_bones['control'][previous_index]]
+            previous_index    = ctrls_n_parent.index( bone ) - 1
+            eb[ bone ].parent = eb[ ctrls_n_parent[previous_index] ]
             
         # Parent tweak bones
         tweaks = all_bones['tweak']
@@ -206,53 +220,56 @@ class Rig:
             eb[ org ].parent = eb[ tweak ]                
         
     
-    def constraints_and_drivers( self, all_bones ):
+    def make_constraints( self, all_bones ):
         bpy.ops.object.mode_set(mode ='OBJECT')
 
         org_bones = self.org_bones
         pb        = self.obj.pose.bones
         
         ## MCH bone constraints
-        mch_pb = pb[ all_bones['mch'] ]
+        if pb[ org_bones[0] ].parent:
+            mch_pb = pb[ all_bones['mch'] ]
 
-        con           = mch_pb.constraints.new('COPY_LOCATION')
-        con.target    = self.obj
-        con.subtarget = pb[ org_bones[0] ].parent.name
-        con.head_tail = 1.0
+            con           = mch_pb.constraints.new('COPY_LOCATION')
+            con.target    = self.obj
+            con.subtarget = pb[ org_bones[0] ].parent.name
+            con.head_tail = 1.0
 
-        con           = mch_pb.constraints.new('COPY_ROTATION')
-        con.target    = self.obj
-        con.subtarget = pb[ org_bones[0] ].parent.name
-        
-        # Setting the MCH prop
-        prop = strip_org( org_bones[0] ) + "_follow"
-        mch_pb[prop] = 1.0
+            con           = mch_pb.constraints.new('COPY_ROTATION')
+            con.target    = self.obj
+            con.subtarget = pb[ org_bones[0] ].parent.name
+            
+            # Setting the MCH prop
+            prop_name    = strip_org( org_bones[0] ) + "_follow"
+            mch_pb[prop_name] = 1.0
 
-        master_pb = pb[ all_bones['master'] ]
-        
-        prop = rna_idprop_ui_prop_get( master_pb, prop )
-        prop["min"] = 0.0
-        prop["max"] = 1.0
-        prop["soft_min"] = 0.0
-        prop["soft_max"] = 1.0
-        prop["description"] = prop
-        
-        # driving the MCH follow rotation switch
+            master_pb = pb[ all_bones['master'] ]
+            
+            prop = rna_idprop_ui_prop_get( master_pb, prop_name )
+            prop["min"] = 0.0
+            prop["max"] = 1.0
+            prop["soft_min"] = 0.0
+            prop["soft_max"] = 1.0
+            prop["description"] = prop_name
+            
+            # driving the MCH follow rotation switch
 
-        drv = mch_pb.constraints[ 1 ].driver_add("influence").driver
-        drv.type='SUM'
-        
-        var = drv.variables.new()
-        var.name = prop
-        var.type = "SINGLE_PROP"
-        var.targets[0].id = self.obj
-        var.targets[0].data_path = \
-            master_pb.path_from_id() + '['+ '"' + prop + '"' + ']'
+            drv = mch_pb.constraints[ 1 ].driver_add("influence").driver
+            drv.type='SUM'
+            
+            var = drv.variables.new()
+            var.name = prop_name
+            var.type = "SINGLE_PROP"
+            var.targets[0].id = self.obj
+            var.targets[0].data_path = \
+                master_pb.path_from_id() + '['+ '"' + prop_name + '"' + ']'
 
         ## Deform bones' constraints
-        for deform, tweak in zip( all_bones['deform'], all_bones['tweak'] ):
-            tweaks = all_bones['tweak']
- 
+        ctrls   = all_bones['control']
+        tweaks  = all_bones['tweak'  ]
+        deforms = all_bones['deform' ]
+
+        for deform, tweak, ctrl in zip( deforms, tweaks, ctrls ):
             con           = pb[deform].constraints.new('COPY_TRANSFORMS')
             con.target    = self.obj
             con.subtarget = tweak
@@ -265,12 +282,12 @@ class Rig:
             con.target    = self.obj
             con.subtarget = tweaks[ tweaks.index( tweak ) + 1 ]
             
-        ## Control bones' constraints
+            ## Control bones' constraints
             if self.params.make_rotations:
-                if ctrl != ctrl_chain[0]:
+                if ctrl != ctrls[0]:
                     con = pb[ctrl].constraints.new('COPY_ROTATION')
                     con.target       = self.obj
-                    con.subtarget    = ctrl_chain[ctrl_chain.index(ctrl)-1]
+                    con.subtarget    = ctrls[ ctrls.index(ctrl) - 1 ]
                     con.use_offset   = True
                     con.target_space = 'LOCAL'
                     con.owner_space  = 'LOCAL'
@@ -278,6 +295,12 @@ class Rig:
 
     def generate(self):
         bpy.ops.object.mode_set(mode ='EDIT')
+        eb = self.obj.data.edit_bones
+
+        # Clear all initial parenting
+        for bone in self.org_bones:
+            eb[ bone ].parent      = None
+            eb[ bone ].use_connect = False
         
         # Create the deformation and control bone chains.
         # Just copies of the original chain.
@@ -288,15 +311,15 @@ class Rig:
         def_chain   = self.make_deform()
 
         all_bones = {
-            'mch'    : mch,
-            'master' : master,
-            'ctrl'   : ctrl_chain,
-            'tweak'  : tweak_chain,
-            'deform' : def_chain
+            'mch'     : mch,
+            'master'  : master,
+            'control' : ctrl_chain,
+            'tweak'   : tweak_chain,
+            'deform'  : def_chain
         }
             
-        self.parent_bones( all_bones )
         self.make_constraints( all_bones )
+        self.parent_bones( all_bones )
 
 
 def add_parameters(params):
