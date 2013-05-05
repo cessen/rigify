@@ -30,10 +30,15 @@ class Rig:
         self.org_bones = [bone_name] + [ b.name for b in b[bone_name].children_recursive ]
         self.params = params
 
-        if params.tweak_extra_layers:
-            self.tweak_layers = list(params.tweak_layers)
+        if params.primary_layers_extra:
+            self.primary_layers = list(params.primary_layers)
         else:
-            self.tweak_layers = None
+            self.primary_layers = None
+
+        if params.secondary_layers_extra:
+            self.secondary_layers = list(params.secondary_layers)
+        else:
+            self.secondary_layers = None
 
     def symmetrical_split( self, bones ):
 
@@ -179,7 +184,7 @@ class Rig:
             create_square_widget(self.obj, master)
 
         # Assign nose_master widget
-        create_square_widget(self.obj, master_nose)
+        create_square_widget(self.obj, master_nose, size = 0.5)
         
         # Assign ears widget
         create_ear_widget( self.obj, earL_ctrl_name )
@@ -201,10 +206,11 @@ class Rig:
                 eyeR_ctrl_name, 
                 eyes_ctrl_name,
             ] + eye_master_names,
-            'ears'   : [ earL_ctrl_name, earR_ctrl_name                 ],
-            'jaw'    : [ jaw_ctrl_name                                  ],
-            'teeth'  : [ teethT_ctrl_name, teethB_ctrl_name             ],
-            'tongue' : [ tongue_ctrl_name                               ]
+            'ears'   : [ earL_ctrl_name, earR_ctrl_name     ],
+            'jaw'    : [ jaw_ctrl_name                      ],
+            'teeth'  : [ teethT_ctrl_name, teethB_ctrl_name ],
+            'tongue' : [ tongue_ctrl_name                   ],
+            'nose'   : [ master_nose                        ]
             }
             
 
@@ -252,12 +258,25 @@ class Rig:
             
         bpy.ops.object.mode_set(mode ='OBJECT')
         pb = self.obj.pose.bones
-            
+        
+        primary_tweaks = [
+            "lid.B.L.002", "lid.T.L.002", "lid.B.R.002", "lid.T.R.002", 
+            "chin", "brow.T.L.001", "brow.T.L.002", "brow.T.L.003", 
+            "brow.T.R.001", "brow.T.R.002", "brow.T.R.003", "lip.B", 
+            "lip.B.L.001", "lip.B.R.001", "cheek.B.L.001", "cheek.B.R.001", 
+            "lips.L", "lips.R", "lip.T.L.001", "lip.T.R.001", "lip.T", 
+            "nose.002", "nose.L.001", "nose.R.001"
+        ]
+        
         for bone in tweaks:
-            if self.tweak_layers:
-                pb[bone].bone.layers = self.tweak_layers
-
-            create_face_widget( self.obj, bone )
+            if bone in primary_tweaks:
+                if self.primary_layers:
+                    pb[bone].bone.layers = self.primary_layers
+                create_face_widget( self.obj, bone, size = 2.0 )
+            else:
+                if self.secondary_layers:
+                    pb[bone].bone.layers = self.secondary_layers
+                create_face_widget( self.obj, bone )
                     
         return { 'all' : tweaks }
 
@@ -414,7 +433,7 @@ class Rig:
             for area in list( all_bones[category] ):
                 for bone in all_bones[category][area]:
                     eb[ bone ].parent = eb[ face_name ]
-        
+
         ## Parenting all deformation bones and org bones
         
         # Parent all the deformation bones that have respective tweaks
@@ -495,7 +514,7 @@ class Rig:
         for eye in eyes:
             eb[ eye ].parent = eb[ 'eyes' ]
 
-        # parent eye master bones to face
+        ## turbo: parent eye master bones to face
         for eye_master in eyes[2:]:
             eb[ eye_master ].parent = eb[ 'ORG-face' ]
 
@@ -517,6 +536,9 @@ class Rig:
 
         for r in right:
             eb[ r ].parent = eb[ 'eye.R_master' ]
+
+        ## turbo: nose to mch jaw.004
+        eb[ all_bones['ctrls']['nose'].pop() ].parent = eb['MCH-jaw_master.004'] 
 
         ## Parenting the tweak bones
 
@@ -550,12 +572,14 @@ class Rig:
                 'lip.T.R.001'
                 ],
             'MCH-jaw_master.004' : [
+                'cheek.T.L.001',
+                'cheek.T.R.001'
+                ],
+            'nose_master'        : [
                 'nose.002',
                 'nose.004',
                 'nose.L.001',
-                'nose.R.001',
-                'cheek.T.L.001',
-                'cheek.T.R.001'
+                'nose.R.001'
                 ]
              }    
             
@@ -794,7 +818,7 @@ class Rig:
             'lid.B.L.002'   : [ [ 'MCH-eye.L.001', 'cheek.T.L.001' ], [ 0.5, 0.1  ] ],
             'cheek.T.L.001' : [ [ 'cheek.B.L.001',                 ], [ 0.5       ] ],
             'nose.L'        : [ [ 'nose.L.001',                    ], [ 0.25      ] ],
-            'nose.L.001'    : [ [ 'lip.T.L.001',                   ], [ 0.5       ] ],
+            'nose.L.001'    : [ [ 'lip.T.L.001',                   ], [ 0.2       ] ],
             'cheek.B.L.001' : [ [ 'lips.L',                        ], [ 0.5       ] ],
             'lip.T.L.001'   : [ [ 'lips.L', 'lip.T'                ], [ 0.25, 0.5 ] ],
             'lip.B.L.001'   : [ [ 'lips.L', 'lip.B'                ], [ 0.25, 0.5 ] ]
@@ -962,63 +986,55 @@ def add_parameters(params):
     """
 
     #Setting up extra layers for the tweak bones
-    params.tweak_extra_layers = bpy.props.BoolProperty( 
-        name        = "tweak_extra_layers", 
+    params.primary_layers_extra = bpy.props.BoolProperty( 
+        name        = "primary_layers_extra", 
         default     = True, 
         description = ""
         )
-    params.tweak_layers = bpy.props.BoolVectorProperty(
+    params.primary_layers = bpy.props.BoolVectorProperty(
         size        = 32,
-        description = "Layers for the tweak controls to be on",
+        description = "Layers for the 1st tweak controls to be on",
+        default     = tuple( [ i == 1 for i in range(0, 32) ] )
+        )
+    params.secondary_layers_extra = bpy.props.BoolProperty( 
+        name        = "secondary_layers_extra", 
+        default     = True, 
+        description = ""
+        )
+    params.secondary_layers = bpy.props.BoolVectorProperty(
+        size        = 32,
+        description = "Layers for the 2nd tweak controls to be on",
         default     = tuple( [ i == 1 for i in range(0, 32) ] )
         )
 
+
 def parameters_ui(layout, params):
     """ Create the ui for the rig parameters."""
+    layers = ["primary_layers", "secondary_layers"]
     
-    r = layout.row()
-    r.prop(params, "tweak_extra_layers")
-    r.active = params.tweak_extra_layers
-    
-    col = r.column(align=True)
-    row = col.row(align=True)
-    row.prop(params, "tweak_layers", index=0, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=1, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=2, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=3, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=4, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=5, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=6, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=7, toggle=True, text="")
-    row = col.row(align=True)
-    row.prop(params, "tweak_layers", index=16, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=17, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=18, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=19, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=20, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=21, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=22, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=23, toggle=True, text="")
-    
-    col = r.column(align=True)
-    row = col.row(align=True)
-    row.prop(params, "tweak_layers", index=8, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=9, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=10, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=11, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=12, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=13, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=14, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=15, toggle=True, text="")
-    row = col.row(align=True)
-    row.prop(params, "tweak_layers", index=24, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=25, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=26, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=27, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=28, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=29, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=30, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=31, toggle=True, text="")
+    for layer in layers:
+        r = layout.row()
+        r.prop( params, layer + "_extra" )
+        r.active = getattr( params, layer + "_extra" )
+        
+        col = r.column(align=True)
+        row = col.row(align=True)
+        for i in range(8):
+            row.prop(params, layer, index=i, toggle=True, text="")
+
+        row = col.row(align=True)
+        for i in range(16,24):
+            row.prop(params, layer, index=i, toggle=True, text="")
+        
+        col = r.column(align=True)
+        row = col.row(align=True)
+        
+        for i in range(8,16):
+            row.prop(params, layer, index=i, toggle=True, text="")
+
+        row = col.row(align=True)
+        for i in range(24,32):
+            row.prop(params, layer, index=i, toggle=True, text="")
 
 
 def create_sample(obj):
