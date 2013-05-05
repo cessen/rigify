@@ -6,6 +6,18 @@ from ...utils    import create_widget, create_circle_widget
 from ...utils    import MetarigError
 from rna_prop_ui import rna_idprop_ui_prop_get
 
+script = """
+controls    = [%s]
+pb          = bpy.data.objects['%s'].pose.bones
+master_name = '%s'
+
+for name in controls:
+    if is_selected( name ):
+        layout.prop( pb[ master_name ], '["%s"]', slider = True )
+        layout.prop( pb[ master_name ], '["%s"]', slider = True )
+        break
+"""
+
 class Rig:
     
     def __init__(self, obj, bone_name, params):
@@ -26,28 +38,30 @@ class Rig:
 
     def make_mch( self ):
         bpy.ops.object.mode_set(mode ='EDIT')
+        eb = self.obj.data.edit_bones
 
         org_bones  = self.org_bones
         mch_parent = self.obj.data.bones[ org_bones[0] ].parent
+        
+        mch_parent_name = mch_parent.name  # Storing the mch parent's name
         
         if not mch_parent:
             mch_parent = self.obj.data.edit_bones[ org_bones[0] ]
             mch_bone = copy_bone(
                 self.obj, 
-                mch_parent.name,
+                mch_parent_name,
                 make_mechanism_name( strip_org( org_bones[0] ) )
             )
         else:
             mch_bone = copy_bone(
                 self.obj, 
-                mch_parent.name,
+                mch_parent_name,
                 make_mechanism_name( strip_org( org_bones[0] ) )
             )  
-
-            put_bone( self.obj, mch_bone, mch_parent.tail )
-
-        mch_e = self.obj.data.edit_bones[ mch_bone ] # reference edit bone
-        mch_e.length /= 4 # reduce length to fourth of original
+            
+            put_bone( self.obj, mch_bone, eb[ mch_parent_name ].tail )
+        
+        eb[ mch_bone ].length /= 4 # reduce length to fourth of original
         
         return mch_bone
         
@@ -239,30 +253,41 @@ class Rig:
             con.target    = self.obj
             con.subtarget = pb[ org_bones[0] ].parent.name
             
+            con           = mch_pb.constraints.new('COPY_SCALE')
+            con.target    = self.obj
+            con.subtarget = pb[ org_bones[0] ].parent.name
+            
             # Setting the MCH prop
-            prop_name    = strip_org( org_bones[0] ) + "_follow"
-            mch_pb[prop_name] = 1.0
-
             master_pb = pb[ all_bones['master'] ]
+            prop_name_r = "rotation_follow"
+            prop_name_s = "scale_follow"
             
-            prop = rna_idprop_ui_prop_get( master_pb, prop_name )
-            prop["min"] = 0.0
-            prop["max"] = 1.0
-            prop["soft_min"] = 0.0
-            prop["soft_max"] = 1.0
-            prop["description"] = prop_name
+            prop_names = [ prop_name_r, prop_name_s ]
             
-            # driving the MCH follow rotation switch
+            for prop_name in prop_names:
+                master_pb[prop_name] = 1.0
+                
+                prop = rna_idprop_ui_prop_get( master_pb, prop_name )
+                prop["min"] = 0.0
+                prop["max"] = 1.0
+                prop["soft_min"] = 0.0
+                prop["soft_max"] = 1.0
+                prop["description"] = prop_name
+                
+                # driving the MCH follow rotation switch
 
-            drv = mch_pb.constraints[ 1 ].driver_add("influence").driver
-            drv.type='SUM'
-            
-            var = drv.variables.new()
-            var.name = prop_name
-            var.type = "SINGLE_PROP"
-            var.targets[0].id = self.obj
-            var.targets[0].data_path = \
-                master_pb.path_from_id() + '['+ '"' + prop_name + '"' + ']'
+                drv = mch_pb.constraints[ 
+                    prop_names.index(prop_name) +1 
+                ].driver_add("influence").driver
+                
+                drv.type='SUM'
+                
+                var = drv.variables.new()
+                var.name = prop_name
+                var.type = "SINGLE_PROP"
+                var.targets[0].id = self.obj
+                var.targets[0].data_path = \
+                    master_pb.path_from_id() + '['+ '"' + prop_name + '"' + ']'
 
         ## Deform bones' constraints
         ctrls   = all_bones['control']
@@ -299,11 +324,10 @@ class Rig:
 
         # Clear all initial parenting
         for bone in self.org_bones:
-            eb[ bone ].parent      = None
+        #    eb[ bone ].parent      = None
             eb[ bone ].use_connect = False
         
-        # Create the deformation and control bone chains.
-        # Just copies of the original chain.
+        # Creating all bones
         mch         = self.make_mch()
         master      = self.make_master()
         ctrl_chain  = self.make_controls()
@@ -320,6 +344,18 @@ class Rig:
             
         self.make_constraints( all_bones )
         self.parent_bones( all_bones )
+
+        # Create UI
+        all_controls = \
+            all_bones['control'] + all_bones['tweak'] + [ all_bones['master'] ]
+        controls_string = ", ".join(["'" + x + "'" for x in all_controls])
+        return [script % (
+            controls_string,  
+            self.obj.name, 
+            all_bones['master'], 
+            'rotation_follow',
+            'scale_follow'
+            )]
 
 
 def add_parameters(params):
