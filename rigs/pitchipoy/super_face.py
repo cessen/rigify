@@ -120,8 +120,17 @@ class Rig:
         ## turbo: adding a master eye.X for transforming the whole eye
         eye_master_names = []
         for bone in bones['eyes']:
-            eye_master = copy_bone( self.obj, bone,  bone + '_master' )
+            eye_master = copy_bone( 
+                self.obj, 
+                bone,  
+                strip_org(bone) + '_master' 
+            )
+
             eye_master_names.append( eye_master )
+                
+        ## turbo: adding a master nose for transforming the whole nose
+        master_nose = copy_bone(self.obj, 'ORG-nose.004', 'nose_master')
+        eb[master_nose].tail[:] = eb[master_nose].head + Vector([0, -0.025, 0])
         
         # ears ctrls
         earL_name = strip_org( bones['ears'][0] )
@@ -165,6 +174,13 @@ class Rig:
         # Assign eyes widgets
         create_eyes_widget( self.obj, eyes_ctrl_name )
 
+        # Assign each eye_master widgets
+        for master in eye_master_names:
+            create_square_widget(self.obj, master)
+
+        # Assign nose_master widget
+        create_square_widget(self.obj, master_nose)
+        
         # Assign ears widget
         create_ear_widget( self.obj, earL_ctrl_name )
         create_ear_widget( self.obj, earR_ctrl_name )
@@ -472,9 +488,35 @@ class Rig:
         # eyes
         eb[ 'eyes' ].parent = eb[ 'MCH-eyes_parent' ]
         
-        eyes = [ bone for bone in all_bones['ctrls']['eyes'] if 'eyes' not in bone ]
+        eyes = [ 
+            bone for bone in all_bones['ctrls']['eyes'] if 'eyes' not in bone 
+        ][0:2]
+
         for eye in eyes:
             eb[ eye ].parent = eb[ 'eyes' ]
+
+        # parent eye master bones to face
+        for eye_master in eyes[2:]:
+            eb[ eye_master ].parent = eb[ 'ORG-face' ]
+
+        # Parent brow.b, eyes mch and lid tweaks and mch bones to masters
+        tweaks = [ 
+            b for b in all_bones['tweaks']['all'] if 'lid' in b or 'brow.B' in b
+        ]
+        mch = all_bones['mch']['lids']  + \
+              all_bones['mch']['eye.R'] + \
+              all_bones['mch']['eye.L']
+        
+        everyone = tweaks + mch
+        
+        left, right = self.symmetrical_split( everyone )
+        print(left)
+        
+        for l in left:
+            eb[ l ].parent = eb[ 'eye.L_master' ]
+
+        for r in right:
+            eb[ r ].parent = eb[ 'eye.R_master' ]
 
         ## Parenting the tweak bones
 
@@ -2287,3 +2329,25 @@ def create_sample(obj):
         bone.select_head = True
         bone.select_tail = True
         arm.edit_bones.active = bone
+        
+def create_square_widget(rig, bone_name, size=1.0, bone_transform_name=None):
+    obj = create_widget(rig, bone_name, bone_transform_name)
+    if obj != None:
+        verts = [
+            (  0.5 * size, -2.9802322387695312e-08 * size,  0.5 * size ), 
+            ( -0.5 * size, -2.9802322387695312e-08 * size,  0.5 * size ), 
+            (  0.5 * size,  2.9802322387695312e-08 * size, -0.5 * size ), 
+            ( -0.5 * size,  2.9802322387695312e-08 * size, -0.5 * size ), 
+        ]
+
+        edges = [(0, 1), (2, 3), (0, 2), (3, 1) ]
+        faces = []
+
+        mesh = obj.data
+        mesh.from_pydata(verts, edges, faces)
+        mesh.update()
+        mesh.update()
+        return obj
+    else:
+        return None
+
