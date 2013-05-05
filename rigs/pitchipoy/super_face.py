@@ -27,8 +27,21 @@ class Rig:
 
         b = self.obj.data.bones
 
-        self.org_bones = [bone_name] + [ b.name for b in b[bone_name].children_recursive ]
-        self.params = params
+        children = [ 
+            "nose", "lip.T.L", "lip.B.L", "jaw", "ear.L", "ear.R", "lip.T.R", 
+            "lip.B.R", "brow.B.L", "lid.T.L", "brow.B.R", "lid.T.R", 
+            "forehead.L", "forehead.R", "eye.L", "eye.R", "cheek.T.L", 
+            "cheek.T.R", "teeth.T", "teeth.B", "tongue"
+        ]
+
+        children     = [ org(b) for b in children ]
+        grand_children = []
+
+        for child in children:
+            grand_children += connected_children_names( self.obj, child )
+            
+        self.org_bones = [bone_name] + children + grand_children
+        self.params    = params
 
         if params.primary_layers_extra:
             self.primary_layers = list(params.primary_layers)
@@ -272,7 +285,7 @@ class Rig:
             if bone in primary_tweaks:
                 if self.primary_layers:
                     pb[bone].bone.layers = self.primary_layers
-                create_face_widget( self.obj, bone, size = 2.0 )
+                create_face_widget( self.obj, bone, size = 1.5 )
             else:
                 if self.secondary_layers:
                     pb[bone].bone.layers = self.secondary_layers
@@ -529,7 +542,6 @@ class Rig:
         everyone = tweaks + mch
         
         left, right = self.symmetrical_split( everyone )
-        print(left)
         
         for l in left:
             eb[ l ].parent = eb[ 'eye.L_master' ]
