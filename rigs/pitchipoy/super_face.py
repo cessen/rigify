@@ -117,6 +117,12 @@ class Rig:
         for bone in [ eyeL_ctrl_e, eyeR_ctrl_e, eyes_ctrl_e ]:
             bone.tail[:] = bone.head + Vector( [ 0, 0, 0.025 ] )
         
+        ## turbo: adding a master eye.X for transforming the whole eye
+        eye_master_names = []
+        for bone in bones['eyes']:
+            eye_master = copy_bone( self.obj, bone,  bone + '_master' )
+            eye_master_names.append( eye_master )
+        
         # ears ctrls
         earL_name = strip_org( bones['ears'][0] )
         earR_name = strip_org( bones['ears'][1] )
@@ -174,7 +180,11 @@ class Rig:
         create_jaw_widget( self.obj, tongue_ctrl_name )
 
         return { 
-            'eyes'   : [ eyeL_ctrl_name, eyeR_ctrl_name, eyes_ctrl_name ],
+            'eyes'   : [ 
+                eyeL_ctrl_name, 
+                eyeR_ctrl_name, 
+                eyes_ctrl_name,
+            ] + eye_master_names,
             'ears'   : [ earL_ctrl_name, earR_ctrl_name                 ],
             'jaw'    : [ jaw_ctrl_name                                  ],
             'teeth'  : [ teethT_ctrl_name, teethB_ctrl_name             ],
