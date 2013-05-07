@@ -31,8 +31,11 @@ class Rig:
             "nose", "lip.T.L", "lip.B.L", "jaw", "ear.L", "ear.R", "lip.T.R", 
             "lip.B.R", "brow.B.L", "lid.T.L", "brow.B.R", "lid.T.R", 
             "forehead.L", "forehead.R", "eye.L", "eye.R", "cheek.T.L", 
-            "cheek.T.R", "teeth.T", "teeth.B", "tongue"
+            "cheek.T.R", "teeth.T", "teeth.B", "tongue", "temple.L",
+            "temple.R"
         ]
+
+        #create_pose_lib( self.obj )
 
         children     = [ org(b) for b in children ]
         grand_children = []
@@ -480,7 +483,7 @@ class Rig:
         brows = [ 'brow.T.L', 'brow.T.R' ]
         cheekB_defs = [ 'DEF-cheek.B.L', 'DEF-cheek.B.R' ]
         cheekT_defs = [ 'DEF-cheek.T.L', 'DEF-cheek.T.R' ]
-        
+
         for lip, brow, cheekB, cheekT in zip( lips, brows, cheekB_defs, cheekT_defs ):
             eb[ cheekB ].parent = eb[ lip ]
             eb[ cheekT ].parent = eb[ brow ]
@@ -971,6 +974,7 @@ class Rig:
         self.constraints( all_bones )
         jaw_prop, eyes_prop = self.drivers_and_props( all_bones )
 
+        
         # Create UI
         all_controls = []
         all_controls += [ bone for bone in [ bgroup for bgroup in [ all_bones['ctrls'][group] for group in list( all_bones['ctrls'].keys() ) ] ] ]
