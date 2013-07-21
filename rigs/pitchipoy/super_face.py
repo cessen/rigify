@@ -30,7 +30,8 @@ class Rig:
         children = [ 
             "nose", "lip.T.L", "lip.B.L", "jaw", "ear.L", "ear.R", "lip.T.R", 
             "lip.B.R", "brow.B.L", "lid.T.L", "brow.B.R", "lid.T.R", 
-            "forehead.L", "forehead.R", "eye.L", "eye.R", "cheek.T.L", 
+            "forehead.L", "forehead.R", "forehead.L.001", "forehead.R.001",
+            "forehead.L.002", "forehead.R.002", "eye.L", "eye.R", "cheek.T.L", 
             "cheek.T.R", "teeth.T", "teeth.B", "tongue", "temple.L",
             "temple.R"
         ]
@@ -44,6 +45,7 @@ class Rig:
             grand_children += connected_children_names( self.obj, child )
             
         self.org_bones = [bone_name] + children + grand_children
+        
         self.params    = params
 
         if params.primary_layers_extra:
@@ -100,6 +102,7 @@ class Rig:
 
         for browL, browR, foreheadL, foreheadR in zip( 
             brow_left, brow_right, forehead_left, forehead_right ):
+
             eb[foreheadL].tail = eb[browL].head
             eb[foreheadR].tail = eb[browR].head
         
