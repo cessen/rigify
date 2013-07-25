@@ -43,7 +43,8 @@ class Rig:
         org_name  = self.org_bones[0]
         temp_name = strip_org(self.org_bones[0])
         
-        master_name      = temp_name + "_master"
+        suffix = temp_name[-2:]
+        master_name      = temp_name[:-5] + "_master" + suffix
         master_name      = copy_bone( self.obj, org_name, master_name )
         ctrl_bone_master = eb[ master_name ]
         
