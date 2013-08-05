@@ -92,6 +92,19 @@ class Rig:
         else:
             return 'ERROR'
 
+    def orient_bone( self, eb, axis, scale, reverse = False ):
+        v = Vector((0,0,0))
+       
+        setattr(v,axis,scale)
+
+        if reverse:
+            tail_vec = v * self.obj.matrix_world
+            eb.head[:] = eb.tail
+            eb.tail[:] = eb.head + tail_vec     
+        else:
+            tail_vec = v * self.obj.matrix_world
+            eb.tail[:] = eb.head + tail_vec
+
 
     def create_pivot( self, pivot ):
         """ Create the pivot control and mechanism bones """
@@ -105,8 +118,7 @@ class Rig:
         ctrl_name  = copy_bone(self.obj, pivot_name, torso_name)
         ctrl_eb    = eb[ ctrl_name ]
         
-        tail_vec = Vector((0, 0.25, 0)) * self.obj.matrix_world
-        ctrl_eb.tail[:] = ctrl_eb.head + tail_vec
+        self.orient_bone( ctrl_eb, 'y', 0.25 )
         
         # Create mch_pivot
         mch_name = make_mechanism_name( strip_org( pivot_name ) )
@@ -133,7 +145,180 @@ class Rig:
             def_name = copy_bone( self.obj, org, def_name )
             def_bones.append( def_name )
         
-        return { 'def_bones' : def_bones }
+        return def_bones
+
+        
+    def create_neck( self, neck_bones ):
+        org_bones = self.org_bones
+        
+        bpy.ops.object.mode_set(mode ='EDIT')
+        eb = self.obj.data.edit_bones
+        
+        # Create neck control
+        neck    = copy_bone( self.obj, org(neck_bones[0], 'neck' )
+        neck_eb = eb[ neck ]
+
+        # Neck spans all neck bones (except head)
+        neck_eb.tail[:] = eb[ org(neck_bones[-1]) ].head
+
+        # Create head control
+        head = copy_bone( self.obj, org(neck_bones[-1]), 'head' )
+
+        # MCH bones
+        # Neck MCH rotation
+        mch_neck = copy_bone( 
+            self.obj, neck, make_mechanism_name('ROT-neck')
+        )
+
+        self.orient_bone( eb[mch_neck], 'y', 0.01 )
+
+        # Head MCH rotation
+        mch_head = copy_bone( 
+            self.obj, head, make_mechanism_name('ROT-head')
+        )
+
+        self.orient_bone( eb[mch_head], 'y', 0.01 )
+
+        mch = []
+
+        # Intermediary bones
+        for b in neck_bones[1:-1]: # all except 1st neck and (last) head
+            mch_name = copy_bone( self.obj, org(b), make_mechanism_name(b) )
+            eb[mch_name].length /= 4
+
+            twk_name = "tweak_" + b
+            twk_name = copy_bone( self.obj, org(b), twk_name )
+            
+            eb[twk_name].length /= 2
+            twk_bones.append( twk_name )
+
+            mch += [ mch_name ]
+            twk += [ twk_name ]
+
+        return {
+            'ctrl_neck' : neck,
+            'ctrl_head' : head,
+            'mch_neck'  : mch_neck,
+            'mch_head'  : mch_head,
+            'mch'       : mch,
+            'tweak'     : twk
+        }
+
+
+    def create_chest( self, chest_bones ):
+        org_bones = self.org_bones
+        
+        bpy.ops.object.mode_set(mode ='EDIT')
+        eb = self.obj.data.edit_bones
+        
+        # Create chest control bone
+        chest = copy_bone( self.obj, org( chest_bones[0] ), 'chest' )
+        self.orient_bone( eb[chest], 'y', 0.2 )
+        
+        # Create mch bones
+        mch = []
+        for b in chest_bones:
+            mch_name = copy_bone( self.obj, org(b), make_mechanism_name(b) )
+            orient_bone( eb[mch_name], 'y', 0.01 )
+
+            twk_name = "tweak_" + b
+            twk_name = copy_bone( self.obj, org(b), twk_name )
+            
+            eb[twk_name].length /= 2
+            twk_bones.append( twk_name )
+
+            mch += [ mch_name ]
+            twk += [ twk_name ]
+
+        return {
+            'ctrl'  : chest,
+            'mch'   : mch,
+            'tweak' : twk
+        }
+
+
+    def create_hips( self, hip_bones ):
+        org_bones = self.org_bones
+        
+        bpy.ops.object.mode_set(mode ='EDIT')
+        eb = self.obj.data.edit_bones
+        
+        # Create hips control bone
+        hips = copy_bone( self.obj, org( hip_bones[-1] ), 'hips' )
+        orient_bone( eb[hips], 'y', 0.1, reverse = True )
+
+        # Create mch and tweak bones
+        twk,mch = [],[]
+        for b in hip_bones:
+            mch_name = copy_bone( self.obj, org(b), make_mechanism_name(b) )
+            orient_bone( eb[mch_name], 'y', 0.01, reverse = True )
+
+            twk_name = "tweak_" + b
+            twk_name = copy_bone( self.obj, org( b ), twk_name )
+            
+            eb[twk_name].length /= 2
+            twk_bones.append( twk_name )
+
+            mch += [ mch_name ]
+            twk += [ twk_name ]
+
+        return {
+            'ctrl'  : hips,
+            'mch'   : mch,
+            'tweak' : twk
+        }
+
+
+    def parent_bones( self, bones ):
+        
+        org bones = self.org_bones
+
+        bpy.ops.object.mode_set(mode ='EDIT')
+        eb = self.obj.data.edit_bones
+        
+        # Parent deform bones
+        for i,b in enumerate( bones['def_bones'] ):
+            if i > 0: # For all bones but the first (which has no parent)
+                eb[b].parent = eb[ bones['def_bones'][i-1] ] # Parent = previous
+        
+        # Parent control bones
+        # Head control => MCH-rotation_head
+        eb[ bones['neck']['ctrl_head'] ].parent = eb[ bones['neck']['mch_head'] ]
+
+        # Neck control => MCH-rotation_neck
+        eb[ bones['neck']['ctrl_neck'] ].parent = eb[ bones['neck']['mch_neck'] ]
+
+        # Parent hips and chest controls to torso
+        eb[ bones['chest']['ctrl'] ].parent = eb[ bones['pivot']['ctrl'] ]
+        eb[ bones['hips']['ctrl'] ].parent  = eb[ bones['pivot']['ctrl'] ]
+
+        # Parent mch bones
+        parent = eb[ bones['neck']['ctrl_neck'] ]
+        eb[ bones['neck']['mch_head'] ].parent = parent
+        
+        for eb in [ eb[b] for b in bones['neck']['mch'] ]:
+            eb.parent = parent
+            
+        # chest mch bones and neck mch
+        chest_mch = bones['chest']['mch'] + bones['neck']['mch_neck']
+        for i,b in enumerate(chest_mch):
+            if i == 0:
+                eb[b].parent = eb[ bones['pivot']['ctrl'] ]
+            else:
+                eb[b].parent = eb[ chest_mch[i-1] ]
+
+        # hips mch bones
+        for i,b in enumerate( bones['hips']['mch'] ):
+            if i == len(bones['hips']['mch']) - 1:
+                eb[b].parent = eb[ bones['pivot']['ctrl'] ]
+            else:
+                eb[b].parent = eb[ bones['hips']['mch'][i+1] ]
+        
+        # mch pivot
+        eb[ bones['pivot']['mch'].parent = eb[ bones['chest']['mch'][0] ]
+        
+        # tweaks
+        
         
         
 
@@ -145,10 +330,18 @@ class Rig:
         # Upper torso: all bones between pivot and neck start
         # Lower torso: all bones below pivot until tail point
         # Tail: all bones below tail point
-        
+
         bone_chains = self.build_bone_structure()
 
-        if all_bones != 'ERROR':
+        bpy.ops.object.mode_set(mode ='EDIT')
+        eb = self.obj.data.edit_bones
+
+        # Clear parents for org bones
+        for bone in self.org_bones:
+            eb[bone].use_connect = False
+            eb[bone].parent      = None
+
+        if bone_chains != 'ERROR':
 
             # Create lists of bones and strip "ORG" from their names
             neck_bones        = [ strip_org(b) for b in bone_chains['neck' ] ]
@@ -158,16 +351,23 @@ class Rig:
 
             bones = {}
 
+            bones['def']   = self.create_deform() # Gets org bones from self
             bones['torso'] = self.create_pivot( self.pivot_pos )
             bones['neck']  = self.create_neck( neck_bones )
             bones['chest'] = self.create_upper_torso( upper_torso_bones )
             bones['hips']  = self.create_lower_torso( lower_torso_bones )
+            bones['tweak'] = self.create_tweaks() # Gets org bones from self
+
 
             if tail_bones:
                 bones['tail'] = self.create_tail( tail_bones )
 
+            parent_bones( bones )
+            constrain_bones( bones )
+            locks_and_widgets( bones )
 
-        
+
+
 
 
 
@@ -373,10 +573,6 @@ class Rig:
         bpy.ops.object.mode_set(mode ='EDIT')
         eb = self.obj.data.edit_bones
 
-        # Clear parents for org bones
-        for bone in org_bones:
-            eb[bone].use_connect = False
-            eb[bone].parent      = None
         
         torso       = self.create_torso()
         hips        = self.create_hips()
