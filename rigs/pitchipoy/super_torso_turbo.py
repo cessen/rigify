@@ -199,7 +199,7 @@ class Rig:
 
         return {
             'ctrl_neck' : neck,
-            'ctrl_head' : head,
+            'ctrl'      : head,
             'mch_neck'  : mch_neck,
             'mch_head'  : mch_head,
             'mch'       : mch,
@@ -283,7 +283,7 @@ class Rig:
         
         # Parent control bones
         # Head control => MCH-rotation_head
-        eb[ bones['neck']['ctrl_head'] ].parent = eb[ bones['neck']['mch_head'] ]
+        eb[ bones['neck']['ctrl'] ].parent = eb[ bones['neck']['mch_head'] ]
 
         # Neck control => MCH-rotation_neck
         eb[ bones['neck']['ctrl_neck'] ].parent = eb[ bones['neck']['mch_neck'] ]
@@ -338,8 +338,86 @@ class Rig:
         for twk,mch in zip( bones['hips']['tweak'], bones['hips']['mch'] ):
             eb[ twk ].parent = eb[ mch ]
 
+
+    def make_constraint( self, bone, constraint ):
+        bpy.ops.object.mode_set(mode = 'OBJECT')
+        pb = self.obj.pose.bones
+
+        owner_pb     = pb[bone]
+        const        = owner_pb.constraints.new( constraint['constraint'] )
+        const.target = self.obj
+
+        # filter contraint props to those that actually exist in the currnet 
+        # type of constraint, then assign values to each
+        for p in [ k for k in constraint.keys() if k in dir(const) ]:
+            setattr( const, p, constraint[p] )
+
+
     def constrain_bones( self, bones ):
+        # MCH bones
+
+        # head and neck MCH bones
+        for b in [ bones['neck']['head_mch'], bones['neck']['neck_mch'] ]:
+            self.make_constraint( b, { 
+                'constraint' : 'COPY_ROTATION',
+                'subtarget'  : bones['pivot']['ctrl'],
+            } )
+            self.make_constraint( b, { 
+                'constraint' : 'COPY_SCALE',
+                'subtarget'  : bones['pivot']['ctrl'],
+            } )
+            
+        # Intermediary mch bones
+        intermediaries = [ bones['neck'], bones['chest'], bones['hips'] ]
         
+        if tail in bones.keys():
+            intermediaries += bones['tail']
+
+        for l in intermediaries:
+            mch    = l['mch']
+            factor = float( 1 / len( l['tweak'] ) )
+
+            for b in mch:
+                self.make_constraint( b, { 
+                    'constraint'  : 'COPY_TRANSFORMS',
+                    'subtarget'   : l['ctrl'],
+                    'infuence'    : factor,
+                    'ownerspace'  : 'LOCAL',
+                    'targetspace' : 'LOCAL'
+                } )
+        
+        # MCH pivot
+        self.make_constraint( bones['pivot']['mch'], {
+            'constraint'  : 'COPY_TRANSFORMS',
+            'subtarget'   : bones['hips']['mch'][-1],
+            'ownerspace'  : 'LOCAL',
+            'targetspace' : 'LOCAL'
+        })
+        
+        # DEF bones
+        deform =  bones['deform']
+        tweaks =  bones['neck']['ctrl']   + bones['neck']['tweak'] 
+        tweaks += bones['chest']['tweak'] + bones['hips']['tweak']
+
+        for d,t in zip(deform, tweaks[::-1]):
+            tidx = tweaks.index[t]
+
+            self.make_constraint( bones['pivot']['mch'], {
+                'constraint'  : 'COPY_TRANSFORMS',
+                'subtarget'   : t
+            })
+
+            if tidx != len(tweaks) - 1:
+                self.make_constraint( bones['pivot']['mch'], {
+                    'constraint'  : 'DAMPED_TRACK',
+                    'subtarget'   : tweaks[ tidx + 1 ],
+                })
+
+                self.make_constraint( bones['pivot']['mch'], {
+                    'constraint'  : 'STRETCH_TO',
+                    'subtarget'   : tweaks[ tidx + 1 ],
+                })
+            
 
 
     def create_torso( self ):
@@ -811,38 +889,6 @@ class Rig:
                 self.make_constraint(bone, constraint)
 
 
-    def make_constraint( self, bone, constraint ):
-        const_type = constraint['constraint']
-        subtarget  = constraint['subtarget']
-        
-        bpy.ops.object.mode_set(mode ='OBJECT')
-        pb = self.obj.pose.bones
-        
-        owner_pb = pb[bone]
-        const = owner_pb.constraints.new( const_type )
-        
-        const.target    = self.obj
-        const.subtarget = subtarget
-        
-        try:
-            const.influence = constraint['influence']
-        except:
-            pass
-        
-        try:
-            const.head_tail = constraint['head_tail']
-        except:
-            pass
-
-        try:
-            const.owner_space = constraint['ownerspace']
-        except:
-            pass
-
-        try:
-            const.target_space = constraint['targetspace']
-        except:
-            pass
 
     def drivers_and_props( self, all_bones ):
         
