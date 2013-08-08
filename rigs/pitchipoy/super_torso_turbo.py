@@ -7,16 +7,14 @@ from ...utils import MetarigError, make_mechanism_name, create_cube_widget
 from rna_prop_ui import rna_idprop_ui_prop_get
 
 script = """
-controls    = [%s]
-head_name   = '%s'
-neck_name   = '%s'
-pb          = bpy.data.objects['%s'].pose.bones
-torso_name  = '%s'
+controls = [%s]
+pb       = bpy.data.objects['%s'].pose.bones
+torso    = '%s'
 
 for name in controls:
     if is_selected( name ):
-        layout.prop( pb[ torso_name ], '["%s"]', slider = True )
-        layout.prop( pb[ torso_name ], '["%s"]', slider = True )
+        layout.prop( pb[ torso ], '["%s"]', slider = True )
+        layout.prop( pb[ torso ], '["%s"]', slider = True )
         break
 """
 
@@ -554,7 +552,7 @@ class Rig:
                 pb[bone].bone.layers = self.tweak_layers        
 
 
-    def create_torso( self ):
+    def generate( self ):
     
         # Torso Rig Anatomy:
         # Neck: all bones above neck point, last bone is head
@@ -599,51 +597,18 @@ class Rig:
             self.locks_and_widgets( bones )
 
 
-
-    def bone_properties( self, all_bones ):
-        ## Setting all the properties of the bones relevant to posemode
+        controls =  [ bones['neck']['ctrl'],  bones['neck']['neck_ctrl'] ]
+        controls += [ bones['chest']['ctrl'], bones['hips']['ctrl']      ]
         
-        bpy.ops.object.mode_set(mode ='OBJECT')
-        pb = self.obj.pose.bones
-        
-        # Referencing relevant bones
-        hips_tweak_name  = all_bones['hips']['tweak']
-        back_tweak_names = all_bones['back']['tweak_bones']
-        neck_tweak_names = all_bones['neck']['tweak_bones']
-        
-        tweak_names = [ hips_tweak_name ] + back_tweak_names + neck_tweak_names
-        
-        def_names = all_bones['def']['def_bones']
-        
-        
-
-        
-        all_controls = [ torso_name ] + control_names + tweak_names
-
-        return all_controls
-
-    def generate(self):
-        
-        all_bones = self.create_bones()
-        self.parent_bones( all_bones )
-        constraint_data = self.constraints_data( all_bones )
-        self.set_constraints( constraint_data )
-        self.drivers_and_props( all_bones )
-        self.bone_properties( all_bones )
-        all_controls = self.assign_widgets( all_bones )
-
-        torso_name      = all_bones['torso']['ctrl']
-        neck_ctrl_name  = all_bones['neck']['ctrl']
-        head_ctrl_name  = all_bones['head']['ctrl']
+        if 'tail' in bones.keys():
+            controls += [ bones['tail']['ctrl'] ]
 
         # Create UI
-        controls_string = ", ".join(["'" + x + "'" for x in all_controls])
+        controls_string = ", ".join(["'" + x + "'" for x in controls])
         return [script % (
             controls_string, 
-            head_ctrl_name, 
-            neck_ctrl_name, 
             self.obj.name, 
-            torso_name, 
+            bones['pivot']['ctrl'], 
             'head_follow',
             'neck_follow'
             )]
@@ -652,12 +617,26 @@ def add_parameters( params ):
     """ Add the parameters of this rig type to the
         RigifyParameters PropertyGroup
     """
-    # varifying the name of the torso bone
-    params.torso_name = bpy.props.StringProperty(
-        name="torso_name", 
-        default="torso",
-        description="The name of the torso master control bone"
-        )
+    params.neck_pos = bpy.props.IntProperty(
+        name        = 'neck_position',
+        default     = 6,
+        min         = 0,
+        description = 'Neck start position'
+    )
+
+    params.pivot_pos = bpy.props.IntProperty(
+        name         = 'pivot_position',
+        default      = 3,
+        min          = 0,
+        description  = 'Position of the torso control and pivot point'
+    )
+
+    params.tail_pos = bpy.props.IntProperty(
+        name        = 'tail_position',
+        default     = 0,
+        min         = 0,
+        description = 'Where the tail starts (change from 0 to enable)'
+    )
 
     # Setting up extra layers for the FK and tweak
     params.tweak_extra_layers = bpy.props.BoolProperty( 
@@ -685,175 +664,22 @@ def parameters_ui(layout, params):
     
     col = r.column(align=True)
     row = col.row(align=True)
-    row.prop(params, "tweak_layers", index=0, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=1, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=2, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=3, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=4, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=5, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=6, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=7, toggle=True, text="")
+
+    for i in range(8):
+        row.prop(params, "tweak_layers", index=i, toggle=True, text="")
+
     row = col.row(align=True)
-    row.prop(params, "tweak_layers", index=16, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=17, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=18, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=19, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=20, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=21, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=22, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=23, toggle=True, text="")
-    
+
+    for i in range(16,24):
+        row.prop(params, "tweak_layers", index=i, toggle=True, text="")
+
     col = r.column(align=True)
     row = col.row(align=True)
-    row.prop(params, "tweak_layers", index=8, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=9, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=10, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=11, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=12, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=13, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=14, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=15, toggle=True, text="")
+
+    for i in range(8,16):
+        row.prop(params, "tweak_layers", index=i, toggle=True, text="")
+
     row = col.row(align=True)
-    row.prop(params, "tweak_layers", index=24, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=25, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=26, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=27, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=28, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=29, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=30, toggle=True, text="")
-    row.prop(params, "tweak_layers", index=31, toggle=True, text="")
 
-
-def create_sample(obj):
-    # generated by rigify.utils.write_metarig
-    bpy.ops.object.mode_set(mode='EDIT')
-    arm = obj.data
-
-    bones = {}
-
-    bone = arm.edit_bones.new('hips')
-    bone.head[:] = 0.0000, 0.0351, 1.0742
-    bone.tail[:] = -0.0000, 0.0059, 1.1910
-    bone.roll = 0.0000
-    bone.use_connect = False
-    bones['hips'] = bone.name
-    bone = arm.edit_bones.new('spine')
-    bone.head[:] = -0.0000, 0.0059, 1.1910
-    bone.tail[:] = 0.0000, 0.0065, 1.2768
-    bone.roll = 0.0000
-    bone.use_connect = True
-    bone.parent = arm.edit_bones[bones['hips']]
-    bones['spine'] = bone.name
-    bone = arm.edit_bones.new('ribs')
-    bone.head[:] = 0.0000, 0.0065, 1.2768
-    bone.tail[:] = -0.0000, 0.0251, 1.3655
-    bone.roll = 0.0000
-    bone.use_connect = True
-    bone.parent = arm.edit_bones[bones['spine']]
-    bones['ribs'] = bone.name
-    bone = arm.edit_bones.new('ribs.001')
-    bone.head[:] = -0.0000, 0.0251, 1.3655
-    bone.tail[:] = 0.0000, 0.0217, 1.4483
-    bone.roll = 0.0000
-    bone.use_connect = True
-    bone.parent = arm.edit_bones[bones['ribs']]
-    bones['ribs.001'] = bone.name
-    bone = arm.edit_bones.new('neck')
-    bone.head[:] = 0.0000, 0.0217, 1.4483
-    bone.tail[:] = 0.0000, 0.0092, 1.4975
-    bone.roll = 0.0000
-    bone.use_connect = True
-    bone.parent = arm.edit_bones[bones['ribs.001']]
-    bones['neck'] = bone.name
-    bone = arm.edit_bones.new('neck.001')
-    bone.head[:] = 0.0000, 0.0092, 1.4975
-    bone.tail[:] = -0.0000, -0.0013, 1.5437
-    bone.roll = -0.0000
-    bone.use_connect = True
-    bone.parent = arm.edit_bones[bones['neck']]
-    bones['neck.001'] = bone.name
-    bone = arm.edit_bones.new('head')
-    bone.head[:] = -0.0000, -0.0013, 1.5437
-    bone.tail[:] = -0.0000, -0.0013, 1.7037
-    bone.roll = 0.0000
-    bone.use_connect = True
-    bone.parent = arm.edit_bones[bones['neck.001']]
-    bones['head'] = bone.name
-
-    bpy.ops.object.mode_set(mode='OBJECT')
-    pbone = obj.pose.bones[bones['hips']]
-    pbone.rigify_type = 'pitchipoy.turbo_torso'
-    pbone.lock_location = (False, False, False)
-    pbone.lock_rotation = (False, False, False)
-    pbone.lock_rotation_w = False
-    pbone.lock_scale = (False, False, False)
-    pbone.rotation_mode = 'QUATERNION'
-    try:
-        pbone.rigify_parameters.extra_layers = [False, True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
-    except AttributeError:
-        pass
-    try:
-        pbone.rigify_parameters.tweak_layers = [False, False, False, True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
-    except AttributeError:
-        pass
-    try:
-        pbone.rigify_parameters.fk_layers = [False, False, False, True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
-    except AttributeError:
-        pass
-    pbone = obj.pose.bones[bones['spine']]
-    pbone.rigify_type = ''
-    pbone.lock_location = (False, False, False)
-    pbone.lock_rotation = (False, False, False)
-    pbone.lock_rotation_w = False
-    pbone.lock_scale = (False, False, False)
-    pbone.rotation_mode = 'QUATERNION'
-    pbone = obj.pose.bones[bones['ribs']]
-    pbone.rigify_type = ''
-    pbone.lock_location = (False, False, False)
-    pbone.lock_rotation = (False, False, False)
-    pbone.lock_rotation_w = False
-    pbone.lock_scale = (False, False, False)
-    pbone.rotation_mode = 'QUATERNION'
-    pbone = obj.pose.bones[bones['ribs.001']]
-    pbone.rigify_type = ''
-    pbone.lock_location = (False, False, False)
-    pbone.lock_rotation = (False, False, False)
-    pbone.lock_rotation_w = False
-    pbone.lock_scale = (False, False, False)
-    pbone.rotation_mode = 'QUATERNION'
-    pbone = obj.pose.bones[bones['neck']]
-    pbone.rigify_type = ''
-    pbone.lock_location = (False, False, False)
-    pbone.lock_rotation = (False, False, False)
-    pbone.lock_rotation_w = False
-    pbone.lock_scale = (False, False, False)
-    pbone.rotation_mode = 'QUATERNION'
-    pbone = obj.pose.bones[bones['neck.001']]
-    pbone.rigify_type = ''
-    pbone.lock_location = (False, False, False)
-    pbone.lock_rotation = (False, False, False)
-    pbone.lock_rotation_w = False
-    pbone.lock_scale = (False, False, False)
-    pbone.rotation_mode = 'QUATERNION'
-    pbone = obj.pose.bones[bones['head']]
-    pbone.rigify_type = ''
-    pbone.lock_location = (False, False, False)
-    pbone.lock_rotation = (False, False, False)
-    pbone.lock_rotation_w = False
-    pbone.lock_scale = (False, False, False)
-    pbone.rotation_mode = 'QUATERNION'
-
-    bpy.ops.object.mode_set(mode='EDIT')
-    for bone in arm.edit_bones:
-        bone.select = False
-        bone.select_head = False
-        bone.select_tail = False
-    for b in bones:
-        bone = arm.edit_bones[bones[b]]
-        bone.select = True
-        bone.select_head = True
-        bone.select_tail = True
-        arm.edit_bones.active = bone
-
-if __name__ == "__main__":
-    create_sample(bpy.context.active_object) 
+    for i in range(24,32):
+        row.prop(params, "tweak_layers", index=i, toggle=True, text="")
