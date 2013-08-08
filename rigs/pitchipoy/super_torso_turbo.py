@@ -418,6 +418,41 @@ class Rig:
                     'subtarget'   : tweaks[ tidx + 1 ],
                 })
             
+    def create_drivers( self, bones ):
+        bpy.ops.object.mode_set(mode ='OBJECT')
+        pb = self.obj.pose.bones
+        
+        # Setting the torso's props
+        torso = pb[ bones['pivot']['ctrl'] ]
+
+        props  = [ "head_follow", "neck_follow" ]
+        owners = [ bones['neck']['ctrl'], bones['neck']['neck_ctrl'] ]
+        
+        for prop in props:
+            if prop == 'neck_follow':
+                torso[prop] = 0.5
+            else:
+                torso[prop] = 0.0
+
+            prop = rna_idprop_ui_prop_get( pb_torso, prop )
+            prop["min"]         = 0.0
+            prop["max"]         = 1.0
+            prop["soft_min"]    = 0.0
+            prop["soft_max"]    = 1.0
+            prop["description"] = prop
+        
+        # driving the follow rotation switches for neck and head
+        for bone, prop, in zip( owners, props ):
+            # Add driver to copy rotation constraint
+            drv = pb[ bone ].constraints[ 0 ].driver_add("influence").driver
+            drv.type = 'SUM'
+            
+            var = drv.variables.new()
+            var.name = prop
+            var.type = "SINGLE_PROP"
+            var.targets[0].id = self.obj
+            var.targets[0].data_path = \
+                pb_torso.path_from_id() + '['+ '"' + prop + '"' + ']'
 
 
     def create_torso( self ):
@@ -459,10 +494,10 @@ class Rig:
             if tail_bones:
                 bones['tail'] = self.create_tail( tail_bones )
 
-            self.parent_bones( bones )
-            self.constrain_bones( bones )
+            self.parent_bones(      bones )
+            self.constrain_bones(   bones )
+            self.create_drivers(    bones )
             self.locks_and_widgets( bones )
-
 
 
 
@@ -787,151 +822,7 @@ class Rig:
             eb[bone].parent      = eb[parent]
             
 
-    def constraints_data( self, all_bones ):
-        ## Big mama: the dict that contains all the info about the constraints
-        
-        constraint_data = {}
-        
-        org_bones = self.org_bones
-        
-        # Deformation bone names (1)
-        def_bones = all_bones['def']['def_bones']
-
-        # Referencing def subtargets: tweak bones + head control
-        hips_tweak  = all_bones['hips']['tweak']
-        back_tweaks = all_bones['back']['tweak_bones']
-        neck_tweaks = all_bones['neck']['tweak_bones']
-        head_ctrl   = all_bones['head']['ctrl']
-
-        def_bones_subtargets = \
-            [hips_tweak] + back_tweaks + neck_tweaks + [head_ctrl]
-
-        for bone, subtarget in zip( def_bones, def_bones_subtargets ):
-            if def_bones.index( bone ) != def_bones.index( def_bones[-1] ):
-                next_index     = def_bones.index( bone ) + 1
-                next_subtarget = def_bones_subtargets[ next_index ]
-                
-                constraint_data[ bone ] = [ 
-                    { 'constraint': 'COPY_TRANSFORMS',
-                      'subtarget' : subtarget        },
-                    { 'constraint': 'DAMPED_TRACK', 
-                      'subtarget' : next_subtarget   },
-                    { 'constraint': 'STRETCH_TO',
-                      'subtarget' : next_subtarget   } 
-                ]
-
-            else:
-                constraint_data[ bone ] = [ 
-                    { 'constraint': 'COPY_TRANSFORMS',
-                      'subtarget' : subtarget        }
-                ]
-        
-        # MCH Rotation bone names (2)
-        neck_mch_rot = all_bones['neck']['mch_rot']
-        head_mch_rot = all_bones['head']['mch_rot']
-
-        # MCH rot subtargets:
-        ribs_ctrl = all_bones['back']['ribs_ctrl']
-        neck_ctrl = all_bones['neck']['ctrl']
-
-        for bone, subtarget in zip( 
-            [ neck_mch_rot, head_mch_rot ], [ ribs_ctrl, neck_ctrl ] ):
-        
-            constraint_data[ bone ] = [ 
-                { 'constraint': 'COPY_LOCATION',
-                  'subtarget' : subtarget,
-                  'head_tail' : 1.0              },
-                { 'constraint': 'COPY_ROTATION', 
-                  'subtarget' : subtarget        }
-            ]
-
-        # MCH DRV bone names (3)
-        back_mch_drvs = all_bones['back']['mch_drv_bones']
-        
-        constraint_data[ back_mch_drvs[0] ] = [ 
-            { 'constraint': 'DAMPED_TRACK',
-              'subtarget' : back_tweaks[1]  }       
-        ]
-
-        constraint_data[ back_mch_drvs[1] ] = [ 
-            { 'constraint'  : 'COPY_TRANSFORMS',
-              'subtarget'   : ribs_ctrl,
-              'influence'   : 0.5,
-              'ownerspace'  : 'LOCAL',
-              'targetspace' : 'LOCAL'            },
-            { 'constraint'  : 'DAMPED_TRACK', 
-              'subtarget'   : back_tweaks[2]     }
-        ]
-
-        neck_mch_drv  = all_bones['neck']['mch_drv']
-
-        constraint_data[ neck_mch_drv ] = [ 
-            { 'constraint'  : 'COPY_TRANSFORMS',
-              'subtarget'   : head_ctrl,
-              'influence'   : 0.5,
-              'ownerspace'  : 'LOCAL',
-              'targetspace' : 'LOCAL'                       }
-        ]
-
-        head_mch_drv  = all_bones['head']['mch_drv']
-
-        constraint_data[ head_mch_drv ] = [
-            { 'constraint': 'COPY_LOCATION',
-              'subtarget' : head_ctrl,       }
-        ]
-        
-        return constraint_data
-
-
-    def set_constraints( self, constraint_data ):
-        for bone in constraint_data:
-            for constraint in constraint_data[bone]:
-                self.make_constraint(bone, constraint)
-
-
-
     def drivers_and_props( self, all_bones ):
-        
-        bpy.ops.object.mode_set(mode ='OBJECT')
-        pb = self.obj.pose.bones
-        
-        # Referencing all relevant bones
-        torso_name = all_bones['torso']['ctrl']
-        pb_torso = pb[torso_name]
-        
-        neck_mch_rot = all_bones['neck']['mch_rot']
-        head_mch_rot = all_bones['head']['mch_rot']
-        
-        owner_mch_rot_bones = [ neck_mch_rot, head_mch_rot ]
-        
-        # Setting the torso's props
-        props_list = [ "neck_follow", "head_follow" ]
-        
-        for prop in props_list:
-            
-            if prop == 'neck_follow':
-                pb_torso[prop] = 0.5
-            else:
-                pb_torso[prop] = 0.0
-
-            prop = rna_idprop_ui_prop_get( pb_torso, prop )
-            prop["min"] = 0.0
-            prop["max"] = 1.0
-            prop["soft_min"] = 0.0
-            prop["soft_max"] = 1.0
-            prop["description"] = prop
-        
-        # driving the follow rotation switches for neck and head
-        for bone, prop, in zip( owner_mch_rot_bones, props_list ):
-            drv = pb[ bone ].constraints[ 1 ].driver_add("influence").driver
-            drv.type='SUM'
-            
-            var = drv.variables.new()
-            var.name = prop
-            var.type = "SINGLE_PROP"
-            var.targets[0].id = self.obj
-            var.targets[0].data_path = \
-                pb_torso.path_from_id() + '['+ '"' + prop + '"' + ']'
         
 
     def bone_properties( self, all_bones ):
