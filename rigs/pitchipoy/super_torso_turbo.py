@@ -279,7 +279,8 @@ class Rig:
         # Parent deform bones
         for i,b in enumerate( bones['def_bones'] ):
             if i > 0: # For all bones but the first (which has no parent)
-                eb[b].parent = eb[ bones['def_bones'][i-1] ] # Parent = previous
+                eb[b].parent      = eb[ bones['def_bones'][i-1] ] # to previous
+                eb[b].use_connect = True
         
         # Parent control bones
         # Head control => MCH-rotation_head
@@ -339,6 +340,17 @@ class Rig:
             eb[ twk ].parent = eb[ mch ]
 
 
+        # Parent orgs to matching tweaks
+        tweaks =  [ bones['neck']['ctrl'] ] + bones['neck']['tweak']
+        tweaks += bones['chest']['tweak']   + bones['hips']['tweak']
+        
+        if 'tail' in bones.keys():
+            tweaks += bones['tail']['tweak']
+
+        for org, twk in zip( org_bones, tweaks ):
+            eb[ org ].parent = eb[ twk ]
+
+
     def make_constraint( self, bone, constraint ):
         bpy.ops.object.mode_set(mode = 'OBJECT')
         pb = self.obj.pose.bones
@@ -396,8 +408,8 @@ class Rig:
         
         # DEF bones
         deform =  bones['deform']
-        tweaks =  bones['neck']['ctrl']   + bones['neck']['tweak'] 
-        tweaks += bones['chest']['tweak'] + bones['hips']['tweak']
+        tweaks =  [ bones['neck']['ctrl'] ] + bones['neck']['tweak'] 
+        tweaks += bones['chest']['tweak']   + bones['hips']['tweak']
 
         for d,t in zip(deform, tweaks[::-1]):
             tidx = tweaks.index[t]
@@ -417,6 +429,7 @@ class Rig:
                     'constraint'  : 'STRETCH_TO',
                     'subtarget'   : tweaks[ tidx + 1 ],
                 })
+
             
     def create_drivers( self, bones ):
         bpy.ops.object.mode_set(mode ='OBJECT')
@@ -454,6 +467,92 @@ class Rig:
             var.targets[0].data_path = \
                 pb_torso.path_from_id() + '['+ '"' + prop + '"' + ']'
 
+    
+    def locks_and_widgets( self, bones ):
+        bpy.ops.object.mode_set(mode ='OBJECT')
+        pb = self.obj.pose.bones
+
+        # deform bones bbone segements
+        for bone in bones['deform'][:-1]:
+            self.obj.data.bones[bone].bbone_segments = 8
+
+        self.obj.data.bones[ bones['deform'][0]  ].bbone_in  = 0.0
+        self.obj.data.bones[ bones['deform'][-2] ].bbone_out = 0.0
+
+        # Locks
+        tweaks =  bones['neck']['tweak'] + bones['chest']['tweak']
+        tweaks += bones['hips']['tweak']
+        
+        if 'tail' in bones.keys():
+            tweaks += bones['tail']['tweak']
+
+        # Tweak bones locks
+        for bone in tweaks:
+            pb[bone].lock_rotation = True, False, True
+            pb[bone].lock_scale    = False, True, False
+
+        # Widgets
+        hips_tweak_name  = all_bones['hips']['tweak']
+        back_tweak_names = all_bones['back']['tweak_bones']
+        neck_tweak_names = all_bones['neck']['tweak_bones']
+        
+        tweak_names = [ hips_tweak_name ] + back_tweak_names + neck_tweak_names
+        
+        # Assigning a widget to torso bone
+        create_cube_widget(
+            self.obj, 
+            bones['pivot']['ctrl'], 
+            radius              = 0.5, 
+            bone_transform_name = None
+        )
+        
+        # Assigning widgets to control bones
+        gen_ctrls = [ 
+            bones['neck']['neck_ctrl'], 
+            bones['chest']['ctrl'],
+            bones['hips']['ctrl']
+        ]
+        
+        if 'tail' in bones.keys():
+            gen_ctrls += [ bones['tail']['ctrl'] ]
+            
+        for bone in gen_ctrls:
+            create_circle_widget(
+                self.obj, 
+                bone, 
+                radius              = 1.25, 
+                head_tail           = 0.5, 
+                with_line           = False, 
+                bone_transform_name = None
+            )
+
+        # Head widget
+        create_circle_widget(
+            self.obj, 
+            bones['neck']['ctrl'], 
+            radius              = 1.25, 
+            head_tail           = 1.0, 
+            with_line           = False, 
+            bone_transform_name = None
+        )
+
+        # place widgets on correct bones
+        chest_widget_loc = bones['deform'][self.neck_pos -2]
+        pb[ bones['chest']['ctrl'] ].custom_shape_transform = chest_widget_loc
+
+        hips_widget_loc = bones['deform'][0]
+        if self.tail_pos:
+            hips_widget_loc = bones['deform'][self.tail_pos -1]
+
+        pb[ bones['hips']['ctrl'] ].custom_shape_transform = hips_widget_loc
+
+        # Assigning widgets to tweak bones and layers
+        for bone in tweak_names:
+            create_sphere_widget(self.obj, bone, bone_transform_name=None)
+            
+            if self.tweak_layers:
+                pb[bone].bone.layers = self.tweak_layers        
+
 
     def create_torso( self ):
     
@@ -489,7 +588,7 @@ class Rig:
             bones['chest'] = self.create_upper_torso( upper_torso_bones )
             bones['hips']  = self.create_lower_torso( lower_torso_bones )
             bones['tweak'] = self.create_tweaks() # Gets org bones from self
-
+            # TODO: Add create tail
 
             if tail_bones:
                 bones['tail'] = self.create_tail( tail_bones )
@@ -500,330 +599,6 @@ class Rig:
             self.locks_and_widgets( bones )
 
 
-
-    def create_hips( self ):
-        """ Create the hip bones """
-        
-        org_bones = self.org_bones
-        
-        bpy.ops.object.mode_set(mode ='EDIT')
-        eb = self.obj.data.edit_bones
-        
-        hip_org_name   = org_bones[0]
-        hip_org_bone_e = eb[hip_org_name]
-        ctrl_name      = strip_org(hip_org_name)
-        
-        # Create ctrl
-        ctrl_bone   = copy_bone(self.obj, hip_org_name, ctrl_name )
-        ctrl_bone_e = eb[ctrl_bone]
-        
-        # Flip the hips' direction to create a more natural pivot for rotation
-        flip_bone(self.obj, ctrl_name)
-
-        # Create tweak
-        tweak_bone   = copy_bone(self.obj, hip_org_name, ctrl_name )
-        tweak_bone_e = eb[tweak_bone]
-        tweak_bone_e.length /= 2
-
-        hips_dict = {
-            'ctrl'    : ctrl_bone, 
-            'tweak'   : tweak_bone, 
-        }
-        
-        return hips_dict
-        
-        
-    def create_back( self ):
-        org_bones = self.org_bones
-        
-        bpy.ops.object.mode_set(mode ='EDIT')
-        eb = self.obj.data.edit_bones
-        
-        back_org_bones = [ 'ORG-spine', 'ORG-ribs', 'ORG-ribs.001' ]
-        
-        # Create ribs ctrl bone
-        ribs_ctrl_name = strip_org( back_org_bones[1] )
-        ribs_ctrl_name = copy_bone( 
-            self.obj, 
-            back_org_bones[2], 
-            ribs_ctrl_name
-        )
-
-        ribs_ctrl_bone_e        = eb[ ribs_ctrl_name ]
-        ribs_ctrl_bone_e.parent = None
-
-        # Position the head of the ribs control bone a bit lower to 
-        # change the rotation pivot
-        org_ribs_2_e = eb[ back_org_bones[1] ]
-        ribs_ctrl_bone_e.head[:] = \
-            org_ribs_2_e.tail - ( org_ribs_2_e.tail - org_ribs_2_e.head ) / 3
-        
-        # Create mch_drv bone
-        mch_drv_bones = []        
-        for i in range(2):
-            mch_drv_name = make_mechanism_name( 
-                strip_org( back_org_bones[i] ) 
-            ) + '_DRV'
-
-            mch_drv_name = copy_bone(
-                self.obj,
-                back_org_bones[i],
-                mch_drv_name 
-            )
-            
-            mch_drv_bone_e         = eb[ mch_drv_name ]
-            mch_drv_bone_e.parent  = None
-            mch_drv_bone_e.length /= 4
-
-            mch_drv_bones.append( mch_drv_name )
-        
-        tweak_bones = []
-
-        for org in back_org_bones:
-            # Create tweak bones
-            tweak_name = strip_org(org)
-            tweak_name = copy_bone(self.obj, org, tweak_name )
-
-            tweak_bone_e        = eb[ tweak_name ]
-            tweak_bone_e.parent = None
-            tweak_bone_e.length /= 2
-            
-            tweak_bones.append( tweak_name )
-        
-        back_dict = {
-            'ribs_ctrl'     : ribs_ctrl_name,
-            'mch_drv_bones' : mch_drv_bones,
-            'tweak_bones'   : tweak_bones,
-        }
-        
-        return back_dict
-
-
-    def create_neck( self ):
-        org_bones = self.org_bones
-        
-        bpy.ops.object.mode_set(mode ='EDIT')
-        eb = self.obj.data.edit_bones
-        
-        neck_org_bones = sorted( 
-            [ bone for bone in org_bones if 'neck' in bone.lower() ], 
-            key=str.lower 
-        )
-        
-        # Create ctrl bone
-        ctrl_name = strip_org( neck_org_bones[0] )
-        ctrl_name = copy_bone( self.obj,neck_org_bones[0] ,ctrl_name )
- 
-        ctrl_bone_e         = eb[ctrl_name]
-        ctrl_bone_e.tail[:] = eb[neck_org_bones[-1]].tail
-
-        # Create mch rotation bone
-        mch_rotation_name = make_mechanism_name( ctrl_name ) + '_rotation'
-        mch_rotation_name = copy_bone(
-            self.obj, 
-            'ribs', 
-            mch_rotation_name 
-        )
-
-        mch_rot_e = eb[ mch_rotation_name ]
-        
-        # Position and scale mch rotation bone
-        put_bone( self.obj, mch_rotation_name, eb[ neck_org_bones[0] ].head )
-        mch_rot_e.length /= 3
-
-        # Create mch drv bone
-        mch_drv_name   = make_mechanism_name( ctrl_name ) + '_DRV'
-        mch_drv_name   = copy_bone( self.obj, neck_org_bones[1], mch_drv_name )
-        mch_drv_e      = eb[ mch_drv_name ]
-        mch_drv_e.length /= 4
-        
-        tweak_bones   = []
-        for org in neck_org_bones:
-            # Create tweak bones
-            tweak_name   = copy_bone( self.obj, org, ctrl_name )
-            tweak_bone_e = eb[ tweak_name ]
-            tweak_bone_e.length /= 2
-            
-            tweak_bones.append( tweak_name )
-            
-        neck_dict = {
-            'ctrl'        : ctrl_name,
-            'mch_rot'     : mch_rotation_name,
-            'mch_drv'     : mch_drv_name,
-            'tweak_bones' : tweak_bones,
-        }
-        
-        return neck_dict    
-
-
-    def create_head( self ):
-        org_bones = self.org_bones
-        
-        bpy.ops.object.mode_set(mode ='EDIT')
-        eb = self.obj.data.edit_bones
-        
-        # Create ctrl bone
-        ctrl_name = strip_org( org_bones[-1] )
-        ctrl_name = copy_bone( self.obj, org_bones[-1], ctrl_name )
-        
-        # Create mch rotation bone
-        mch_rotation_name = make_mechanism_name( ctrl_name ) + '_rotation'
-        mch_rotation_name = copy_bone( 
-            self.obj, 
-            'neck', 
-            mch_rotation_name 
-        )
-
-        # Position and scale mch rotation bone
-        mch_rot_e = eb[ mch_rotation_name ]
-        put_bone( self.obj, mch_rotation_name, eb[ org_bones[-1] ].head )
-        mch_rot_e.length /= 3
-        
-        # Create mch drv bone
-        mch_drv_name = make_mechanism_name( ctrl_name ) + '_DRV'
-        mch_drv_name = copy_bone( self.obj, org_bones[-1], mch_drv_name )
-
-        # Scale mch drv bone to a fourth of its size
-        mch_drv_e      = eb[mch_drv_name]
-        mch_drv_e.length /= 4
-        
-        head_dict = {
-            'ctrl'    : ctrl_name, 
-            'mch_rot' : mch_rotation_name, 
-            'mch_drv' : mch_drv_name 
-        }
-        
-        return head_dict
-
-
-
-
-    def create_bones(self):
-        org_bones = self.org_bones
-        bpy.ops.object.mode_set(mode ='EDIT')
-        eb = self.obj.data.edit_bones
-
-        
-        torso       = self.create_torso()
-        hips        = self.create_hips()
-        back        = self.create_back()
-        neck        = self.create_neck()
-        head        = self.create_head()
-        deformation = self.create_deformation()
-        
-        all_bones = {
-            'torso' : torso,
-            'hips'  : hips,
-            'back'  : back,
-            'neck'  : neck,
-            'head'  : head,
-            'def'   : deformation
-        }
-        
-        return all_bones
-
-
-    def parent_bones(self, all_bones):
-        org_bones = self.org_bones
-        
-        bpy.ops.object.mode_set(mode ='EDIT')
-        eb = self.obj.data.edit_bones
-        
-        # Clearing out previous parenting save the org bones
-        for category in all_bones:
-            for bones in all_bones[category]:
-                if isinstance( all_bones[category][bones], list ):
-                    for bone in all_bones[category][bones]:
-                        eb[bone].parent = None
-                else:
-                    eb[ all_bones[category][bones] ].parent = None
-        
-        # Parenting the torso bone
-        torso_name = all_bones['torso']['ctrl']
-        torso_ctrl_e = eb[ torso_name ]
-        torso_ctrl_e.parent = None  # Later rigify will parent to root
-        
-        # Parenting the hips' bones
-        hips_ctrl          = all_bones['hips']['ctrl']        
-        hips_ctrl_e        = eb[ hips_ctrl ]        
-        hips_ctrl_e.parent = torso_ctrl_e
-
-        hips_tweak_name     = all_bones['hips']['tweak']
-        hips_tweak_e        = eb[hips_tweak_name]
-        hips_tweak_e.parent = hips_ctrl_e
-        
-        # Parenting the back bones
-        ribs_ctrl_name     = all_bones['back']['ribs_ctrl']        
-        ribs_ctrl_e        = eb[ribs_ctrl_name]
-        ribs_ctrl_e.parent = torso_ctrl_e
-
-        back_mch_drv_names   = all_bones['back']['mch_drv_bones']
-        back_mch_drvs_e = [ eb[bone] for bone in back_mch_drv_names ]
-
-        back_mch_drvs_e[0].parent = hips_ctrl_e
-        back_mch_drvs_e[1].parent = torso_ctrl_e
-
-        back_tweak_names = all_bones['back']['tweak_bones']
-        back_tweaks_e    = [ eb[bone] for bone in back_tweak_names ]
-        
-        back_tweaks_e[0].parent = back_mch_drvs_e[0]
-        back_tweaks_e[1].parent = back_mch_drvs_e[1]
-        back_tweaks_e[2].parent = ribs_ctrl_e
-        
-        # Parenting the neck bones
-        neck_mch_rot     = all_bones['neck']['mch_rot']
-        neck_ctrl_name   = all_bones['neck']['ctrl']
-        neck_mch_drv     = all_bones['neck']['mch_drv']
-        neck_tweak_names = all_bones['neck']['tweak_bones']
-        
-        neck_mch_rot_e  = eb[ neck_mch_rot ]
-        neck_ctrl_e     = eb[neck_ctrl_name]
-        neck_mch_drv_e  = eb[ neck_mch_drv ]
-        neck_tweaks_e   = [ eb[bone] for bone in neck_tweak_names ]
-        
-        neck_mch_rot_e.parent   = None  # Later rigify will parent to root
-        neck_ctrl_e.parent      = neck_mch_rot_e
-        neck_mch_drv_e.parent   = neck_ctrl_e
-        neck_tweaks_e[0].parent = neck_ctrl_e
-        neck_tweaks_e[1].parent = neck_mch_drv_e
-        
-        # Parenting the head bones
-        head_mch_rot = all_bones['head']['mch_rot']
-        head_ctrl    = all_bones['head']['ctrl']
-        head_mch_drv = all_bones['head']['mch_drv']
-        
-        head_mch_rot_e = eb[ head_mch_rot ]
-        head_ctrl_e    = eb[ head_ctrl    ]
-        head_mch_drv_e = eb[ head_mch_drv ]
-        
-        head_mch_rot_e.parent = None  # Later rigify will parent to root
-        head_ctrl_e.parent    = head_mch_rot_e
-        head_mch_drv_e.parent = neck_ctrl_e
-        
-        # Parenting the deformation bones
-        def_names   = all_bones['def']['def_bones']
-        def_bones_e = [ eb[bone] for bone in def_names ]
-
-        for bone in def_bones_e:
-            if def_bones_e.index(bone) == 0:
-                bone.parent = None # Later rigify will parent to root
-            # While the rest use simple chain parenting
-            else:
-                bone.parent = def_bones_e[ def_bones_e.index(bone) - 1 ]
-                if def_bones_e.index(bone) != len(def_bones_e) - 1:
-                    bone.use_connect = True
-        
-        ## Parenting the org bones to tweak
-        parent_bones = \
-            [hips_tweak_name] + back_tweak_names + neck_tweak_names + [head_ctrl]
-        
-        for bone, parent in zip( org_bones, parent_bones ):
-            eb[bone].use_connect = False
-            eb[bone].parent      = eb[parent]
-            
-
-    def drivers_and_props( self, all_bones ):
-        
 
     def bone_properties( self, all_bones ):
         ## Setting all the properties of the bones relevant to posemode
@@ -840,70 +615,8 @@ class Rig:
         
         def_names = all_bones['def']['def_bones']
         
-        # deformation bones bbone segements
         
-        for bone in def_names[1:-1]:
-            
-            self.obj.data.bones[bone].bbone_segments = 8
-        
-        # control locks - tweak bones
-        for bone in tweak_names:
-            pb[bone].lock_rotation = True, False, True
-            pb[bone].lock_scale    = False, True, False
 
-
-    def assign_widgets( self, all_bones ):
-        
-        bpy.ops.object.mode_set(mode ='OBJECT')
-        pb = self.obj.pose.bones
-        
-        # Referencing the all animatable bones
-        
-        torso_name      = all_bones['torso']['ctrl']
-        
-        hips_ctrl_name  = all_bones['hips']['ctrl']
-        ribs_ctrl_name  = all_bones['back']['ribs_ctrl']
-        neck_ctrl_name  = all_bones['neck']['ctrl']
-        head_ctrl_name  = all_bones['head']['ctrl']
-        
-        control_names = [ 
-            hips_ctrl_name, 
-            ribs_ctrl_name, 
-            neck_ctrl_name, 
-            head_ctrl_name 
-        ]
-        
-        hips_tweak_name  = all_bones['hips']['tweak']
-        back_tweak_names = all_bones['back']['tweak_bones']
-        neck_tweak_names = all_bones['neck']['tweak_bones']
-        
-        tweak_names = [ hips_tweak_name ] + back_tweak_names + neck_tweak_names
-        
-        # Assigning a widget to torso bone
-        create_cube_widget(
-            self.obj, 
-            torso_name, 
-            radius              = 0.5, 
-            bone_transform_name = None
-        )
-        
-        # Assigning widgets to control bones
-        for bone in control_names:
-            create_circle_widget(
-                self.obj, 
-                bone, 
-                radius              = 1.25, 
-                head_tail           = 0.5, 
-                with_line           = False, 
-                bone_transform_name = None
-            )
-        
-        # Assigning widgets to tweak bones and layers
-        for bone in tweak_names:
-            create_sphere_widget(self.obj, bone, bone_transform_name=None)
-            
-            if self.tweak_layers:
-                pb[bone].bone.layers = self.tweak_layers
         
         all_controls = [ torso_name ] + control_names + tweak_names
 
