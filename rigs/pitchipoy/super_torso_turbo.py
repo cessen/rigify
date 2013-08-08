@@ -179,20 +179,22 @@ class Rig:
 
         self.orient_bone( eb[mch_head], 'y', 0.01 )
 
-        mch = []
+        twk,mch = [],[]
 
         # Intermediary bones
-        for b in neck_bones[1:-1]: # all except 1st neck and (last) head
+        for b in neck_bones[1:-1]: # All except 1st neck and (last) head
             mch_name = copy_bone( self.obj, org(b), make_mechanism_name(b) )
             eb[mch_name].length /= 4
 
+            mch += [ mch_name ]
+
+        # Tweak bones
+        for b in neck_bones[:-1]: # All except last bone
             twk_name = "tweak_" + b
-            twk_name = copy_bone( self.obj, org(b), twk_name )
+            twk_name = copy_bone( self.obj, org(b), twk_name )            
             
             eb[twk_name].length /= 2
-            twk_bones.append( twk_name )
 
-            mch += [ mch_name ]
             twk += [ twk_name ]
 
         return {
@@ -215,17 +217,16 @@ class Rig:
         chest = copy_bone( self.obj, org( chest_bones[0] ), 'chest' )
         self.orient_bone( eb[chest], 'y', 0.2 )
         
-        # Create mch bones
-        mch = []
+        # Create mch and twk bones
+        twk,mch = [],[]
+        
         for b in chest_bones:
             mch_name = copy_bone( self.obj, org(b), make_mechanism_name(b) )
             orient_bone( eb[mch_name], 'y', 0.01 )
 
             twk_name = "tweak_" + b
             twk_name = copy_bone( self.obj, org(b), twk_name )
-            
             eb[twk_name].length /= 2
-            twk_bones.append( twk_name )
 
             mch += [ mch_name ]
             twk += [ twk_name ]
@@ -257,7 +258,6 @@ class Rig:
             twk_name = copy_bone( self.obj, org( b ), twk_name )
             
             eb[twk_name].length /= 2
-            twk_bones.append( twk_name )
 
             mch += [ mch_name ]
             twk += [ twk_name ]
@@ -293,13 +293,14 @@ class Rig:
         eb[ bones['hips']['ctrl'] ].parent  = eb[ bones['pivot']['ctrl'] ]
 
         # Parent mch bones
+        # Neck mch
         parent = eb[ bones['neck']['ctrl_neck'] ]
         eb[ bones['neck']['mch_head'] ].parent = parent
         
         for eb in [ eb[b] for b in bones['neck']['mch'] ]:
             eb.parent = parent
             
-        # chest mch bones and neck mch
+        # Chest mch bones and neck mch
         chest_mch = bones['chest']['mch'] + bones['neck']['mch_neck']
         for i,b in enumerate(chest_mch):
             if i == 0:
@@ -307,7 +308,7 @@ class Rig:
             else:
                 eb[b].parent = eb[ chest_mch[i-1] ]
 
-        # hips mch bones
+        # Hips mch bones
         for i,b in enumerate( bones['hips']['mch'] ):
             if i == len(bones['hips']['mch']) - 1:
                 eb[b].parent = eb[ bones['pivot']['ctrl'] ]
@@ -317,9 +318,27 @@ class Rig:
         # mch pivot
         eb[ bones['pivot']['mch'].parent = eb[ bones['chest']['mch'][0] ]
         
-        # tweaks
+        # Tweaks
+
+        # Neck tweaks
+        for twk,mch in zip( bones['neck']['tweak'], bones['neck']['mch'] ):
+            if bones['neck']['tweak'].index( twk ) == 0:
+                eb[ twk ].parent = eb[ bones['neck']['ctrl_neck'] ]
+            else:
+                eb[ twk ].parent = eb[ mch ]
         
-        
+        # Chest tweaks
+        for twk,mch in zip( bones['chest']['tweak'], bones['chest']['mch'] ):
+            if bones['chest']['tweak'].index( twk ) == 0:
+                eb[ twk ].parent = eb[ bones['pivot']['mch'] ]
+            else:
+                eb[ twk ].parent = eb[ mch ]
+                
+        # Hips tweaks
+        for twk,mch in zip( bones['hips']['tweak'], bones['hips']['mch'] ):
+            eb[ twk ].parent = eb[ mch ]
+
+    def constrain_bones( self, bones ):
         
 
 
@@ -362,11 +381,9 @@ class Rig:
             if tail_bones:
                 bones['tail'] = self.create_tail( tail_bones )
 
-            parent_bones( bones )
-            constrain_bones( bones )
-            locks_and_widgets( bones )
-
-
+            self.parent_bones( bones )
+            self.constrain_bones( bones )
+            self.locks_and_widgets( bones )
 
 
 
