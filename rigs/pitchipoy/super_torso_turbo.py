@@ -221,6 +221,12 @@ class Rig:
         # Create chest control bone
         chest = copy_bone( self.obj, org( chest_bones[0] ), 'chest' )
         self.orient_bone( eb[chest], 'y', 0.4 )
+
+        # create chest mch_wgt
+        mch_wgt = copy_bone( 
+            self.obj, org( chest_bones[-1] ), 
+            make_mechanism_name( 'WGT-chest' ) 
+        )
         
         # Create mch and twk bones
         twk,mch = [],[]
@@ -237,9 +243,10 @@ class Rig:
             twk += [ twk_name ]
 
         return {
-            'ctrl'  : chest,
-            'mch'   : mch,
-            'tweak' : twk
+            'ctrl'    : chest,
+            'mch'     : mch,
+            'tweak'   : twk,
+            'mch_wgt' : mch_wgt
         }
 
 
@@ -252,6 +259,12 @@ class Rig:
         # Create hips control bone
         hips = copy_bone( self.obj, org( hip_bones[-1] ), 'hips' )
         self.orient_bone( eb[hips], 'y', 0.4, reverse = True )
+
+        # create hips mch_wgt
+        mch_wgt = copy_bone( 
+            self.obj, org( hip_bones[0] ), 
+            make_mechanism_name( 'WGT-hips' ) 
+        )
 
         # Create mch and tweak bones
         twk,mch = [],[]
@@ -268,9 +281,10 @@ class Rig:
             twk += [ twk_name ]
 
         return {
-            'ctrl'  : hips,
-            'mch'   : mch,
-            'tweak' : twk
+            'ctrl'    : hips,
+            'mch'     : mch,
+            'tweak'   : twk,
+            'mch_wgt' : mch_wgt
         }
 
 
@@ -310,10 +324,7 @@ class Rig:
 
         parent = eb[ bones['neck']['mch_str'] ]
         for i,b in enumerate([ eb[n] for n in bones['neck']['mch'] ]):
-            if i == 0:
-                b.parent = parent
-            else:
-                b.parent = eb[ bones['neck']['mch'][i-1] ]
+            b.parent = parent
             
         # Chest mch bones and neck mch
         chest_mch = bones['chest']['mch'] + [ bones['neck']['mch_neck'] ]
@@ -332,6 +343,10 @@ class Rig:
         
         # mch pivot
         eb[ bones['pivot']['mch'] ].parent = eb[ bones['chest']['mch'][0] ]
+
+        # MCH widgets
+        eb[ bones['chest']['mch_wgt'] ].parent = eb[ bones['chest']['mch'][-1] ]
+        eb[ bones['hips' ]['mch_wgt'] ].parent = eb[ bones['hips' ]['mch'][0 ] ]
         
         # Tweaks
 
@@ -412,16 +427,27 @@ class Rig:
         if 'tail' in bones.keys():
             intermediaries += bones['tail']
 
-        for l in intermediaries:
-            mch    = l['mch']
-            factor = float( 1 / len( l['tweak'] ) )
+        for i,l in enumerate(intermediaries):
+            mch     = l['mch']
+            factor  = float( 1 / len( l['tweak'] ) )
 
-            for b in mch:
-                self.make_constraint( b, { 
-                    'constraint'   : 'COPY_ROTATION',
-                    'subtarget'    : l['ctrl'],
-                    'influence'    : factor,
-                } )
+            for j,b in enumerate(mch):
+                if i == 0:
+                    nfactor = float( (j + 1) / len( mch ) )
+                    self.make_constraint( b, { 
+                        'constraint'   : 'COPY_ROTATION',
+                        'subtarget'    : l['ctrl'],
+                        'influence'    : nfactor
+                    } )
+                else:
+                    self.make_constraint( b, { 
+                        'constraint'   : 'COPY_TRANSFORMS',
+                        'subtarget'    : l['ctrl'],
+                        'influence'    : factor,
+                        'owner_space'  : 'LOCAL',
+                        'target_space' : 'LOCAL'
+                    } )                    
+
         
         # MCH pivot
         self.make_constraint( bones['pivot']['mch'], {
@@ -564,10 +590,10 @@ class Rig:
         )
 
         # place widgets on correct bones
-        chest_widget_loc = pb[ bones['def'][self.neck_pos -2] ]
+        chest_widget_loc = pb[ bones['chest']['mch_wgt'] ]
         pb[ bones['chest']['ctrl'] ].custom_shape_transform = chest_widget_loc
 
-        hips_widget_loc = pb[ bones['def'][0] ] 
+        hips_widget_loc = pb[ bones['hips']['mch_wgt'] ] 
         if 'tail' in bones.keys():
             hips_widget_loc = bones['def'][self.tail_pos -1]
 
