@@ -8,14 +8,11 @@ from rna_prop_ui import rna_idprop_ui_prop_get
 
 script = """
 controls    = [%s]
-pb          = bpy.data.objects['%s'].pose.bones
 master_name = '%s'
 
-for name in controls:
-    if is_selected( name ):
-        layout.prop( pb[ master_name ], '["%s"]', slider = True )
-        layout.prop( pb[ master_name ], '["%s"]', slider = True )
-        break
+if is_selected( controls ):
+    layout.prop( pose_bones[ master_name ], '["%s"]', slider = True )
+    layout.prop( pose_bones[ master_name ], '["%s"]', slider = True )
 """
 
 class Rig:
@@ -74,7 +71,7 @@ class Rig:
         master_bone = copy_bone(
             self.obj, 
             org_bones[0], 
-            strip_org( org_bones[0] ) + "_master"
+            "master_" + strip_org( org_bones[0] )
         )        
 
         # Make widgets
@@ -127,7 +124,7 @@ class Rig:
             tweak_bone = copy_bone(
                 self.obj, 
                 name, 
-                strip_org(name) + "_tweak"
+                "tweak_" + strip_org(name)
             )
 
             tweak_e = eb[ tweak_bone ]
@@ -202,10 +199,10 @@ class Rig:
         # mch bone remains parentless and will be parented to root by rigify
 
         # Parent master bone
-        eb[ all_bones['master'] ].parent = eb[ all_bones['mch'] ]
+        # eb[ all_bones['master'] ].parent = eb[ all_bones['mch'] ]
 
         # Parent control bones
-        ctrls_n_parent = [ all_bones['master'] ] + all_bones['control']
+        # ctrls_n_parent = [ all_bones['master'] ] + all_bones['control']
 
         for bone in ctrls_n_parent[1:]:
             previous_index    = ctrls_n_parent.index( bone ) - 1
@@ -256,7 +253,8 @@ class Rig:
             con           = mch_pb.constraints.new('COPY_SCALE')
             con.target    = self.obj
             con.subtarget = pb[ org_bones[0] ].parent.name
-            
+
+            """            
             # Setting the MCH prop
             master_pb = pb[ all_bones['master'] ]
             prop_name_r = "rotation_follow"
@@ -288,6 +286,8 @@ class Rig:
                 var.targets[0].id = self.obj
                 var.targets[0].data_path = \
                     master_pb.path_from_id() + '['+ '"' + prop_name + '"' + ']'
+
+                """
 
         ## Deform bones' constraints
         ctrls   = all_bones['control']
@@ -329,14 +329,14 @@ class Rig:
         
         # Creating all bones
         mch         = self.make_mch()
-        master      = self.make_master()
+        # master      = self.make_master()
         ctrl_chain  = self.make_controls()
         tweak_chain = self.make_tweaks()
         def_chain   = self.make_deform()
 
         all_bones = {
             'mch'     : mch,
-            'master'  : master,
+            # 'master'  : master,
             'control' : ctrl_chain,
             'tweak'   : tweak_chain,
             'deform'  : def_chain
@@ -345,18 +345,16 @@ class Rig:
         self.make_constraints( all_bones )
         self.parent_bones( all_bones )
 
+        """
         # Create UI
-        all_controls = \
-            all_bones['control'] + all_bones['tweak'] + [ all_bones['master'] ]
+        all_controls    = all_bones['control'] + all_bones['tweak'] # + [ all_bones['master'] ]
         controls_string = ", ".join(["'" + x + "'" for x in all_controls])
         return [script % (
             controls_string,  
-            self.obj.name, 
-            all_bones['master'], 
             'rotation_follow',
             'scale_follow'
             )]
-
+        """
 
 def add_parameters(params):
     """ Add the parameters of this rig type to the

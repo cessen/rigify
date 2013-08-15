@@ -8,14 +8,11 @@ from rna_prop_ui import rna_idprop_ui_prop_get
 
 script = """
 controls = [%s]
-pb       = bpy.data.objects['%s'].pose.bones
 torso    = '%s'
 
-for name in controls:
-    if is_selected( name ):
-        layout.prop( pb[ torso ], '["%s"]', slider = True )
-        layout.prop( pb[ torso ], '["%s"]', slider = True )
-        break
+if is_selected( controls ):
+    layout.prop( pose_bones[ torso ], '["%s"]', slider = True )
+    layout.prop( pose_bones[ torso ], '["%s"]', slider = True )
 """
 
 class Rig:
@@ -498,7 +495,7 @@ class Rig:
             else:
                 torso[prop] = 0.0
 
-            prop = rna_idprop_ui_prop_get( torso, prop )
+            prop = rna_idprop_ui_prop_get( torso, prop, create=True )
             prop["min"]         = 0.0
             prop["max"]         = 1.0
             prop["soft_min"]    = 0.0
@@ -657,6 +654,7 @@ class Rig:
 
         controls =  [ bones['neck']['ctrl'],  bones['neck']['ctrl_neck'] ]
         controls += [ bones['chest']['ctrl'], bones['hips']['ctrl']      ]
+        controls += [ bones['pivot']['ctrl'] ]
         
         if 'tail' in bones.keys():
             controls += [ bones['tail']['ctrl'] ]
@@ -665,7 +663,6 @@ class Rig:
         controls_string = ", ".join(["'" + x + "'" for x in controls])
         return [script % (
             controls_string, 
-            self.obj.name, 
             bones['pivot']['ctrl'], 
             'head_follow',
             'neck_follow'

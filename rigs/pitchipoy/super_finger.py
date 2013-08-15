@@ -8,12 +8,9 @@ from rna_prop_ui import rna_idprop_ui_prop_get
 
 script = """
 controls    = [%s]
-pb          = bpy.data.objects['%s'].pose.bones
 master_name = '%s'
-for name in controls:
-    if is_selected(name):
-        layout.prop(pb[master_name], '["%s"]', text="Curvature", slider=True)
-        break
+if is_selected(controls):
+    layout.prop(pose_bones[master_name], '["%s"]', text="Curvature", slider=True)
 """
 
 class Rig:
@@ -300,8 +297,10 @@ class Rig:
         create_circle_widget(self.obj, tip_name, radius=0.3, head_tail=0.0)
         
         # Create UI
-        controls_string = ", ".join(["'" + x + "'" for x in ctrl_chain]) + ", " + "'" + master_name + "'"
-        return [script % (controls_string, self.obj.name, master_name, 'finger_curve')]
+        controls_string = ", ".join(
+            ["'" + x + "'" for x in ctrl_chain]
+            ) + ", " + "'" + master_name + "'"
+        return [script % (controls_string, master_name, 'finger_curve')]
            
         
 def add_parameters(params):

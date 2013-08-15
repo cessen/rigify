@@ -12,13 +12,10 @@ script = """
 all_controls   = [%s]
 jaw_ctrl_name  = '%s'
 eyes_ctrl_name = '%s'
-pb = bpy.data.objects['%s'].pose.bones
 
-for name in all_controls:
-    if is_selected(name):
-        layout.prop(pb[jaw_ctrl_name],  '["%s"]', slider=True)
-        layout.prop(pb[eyes_ctrl_name], '["%s"]', slider=True)
-        break
+if is_selected(all_controls):
+    layout.prop(pose_bones[jaw_ctrl_name],  '["%s"]', slider=True)
+    layout.prop(pose_bones[eyes_ctrl_name], '["%s"]', slider=True)
 """
 class Rig:
     
@@ -993,7 +990,6 @@ class Rig:
             controls_string, 
             all_bones['ctrls']['jaw'][0],
             all_bones['ctrls']['eyes'][2],
-            self.obj.name,
             jaw_prop,
             eyes_prop )
             ]
