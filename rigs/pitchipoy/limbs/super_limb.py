@@ -1,0 +1,259 @@
+import bpy
+from mathutils   import Vector
+from ...utils    import copy_bone, flip_bone, put_bone, org
+from ...utils    import strip_org, make_deformer_name, connected_children_names 
+from ...utils    import create_circle_widget, create_sphere_widget, create_widget
+from ...utils    import MetarigError, make_mechanism_name, create_cube_widget
+from rna_prop_ui import rna_idprop_ui_prop_get
+from math        import trunc
+
+def orient_bone( cls, eb, axis, scale, reverse = False ):
+    v = Vector((0,0,0))
+   
+    setattr(v,axis,scale)
+
+    if reverse:
+        tail_vec = v * cls.obj.matrix_world
+        eb.head[:] = eb.tail
+        eb.tail[:] = eb.head + tail_vec     
+    else:
+        tail_vec = v * cls.obj.matrix_world
+        eb.tail[:] = eb.head + tail_vec
+
+
+def make_constraint( cls, bone, constraint ):
+    bpy.ops.object.mode_set(mode = 'OBJECT')
+    pb = cls.obj.pose.bones
+
+    owner_pb     = pb[bone]
+    const        = owner_pb.constraints.new( constraint['constraint'] )
+    const.target = cls.obj
+
+    # filter contraint props to those that actually exist in the currnet 
+    # type of constraint, then assign values to each
+    for p in [ k for k in constraint.keys() if k in dir(const) ]:
+        setattr( const, p, constraint[p] )
+
+
+class Limb:
+    def __init__(self, obj, bone_name, params):
+        """ Initialize torso rig and key rig properties """
+        self.obj       = obj
+        self.params    = params
+        self.org_bones = list(
+            [bone_name] + connected_children_names(obj, bone_name)
+            )[:2]  # The basic limb is the first 3 bones
+
+        self.segments = params.segments
+
+        # Assign values to tweak layers props if opted by user
+        if params.tweak_extra_layers:
+            self.tweak_layers = list(params.tweak_layers)
+        else:
+            self.tweak_layers = None
+
+
+    def create_def( self, tweaks ):
+        org_bones = self.org_bones
+        
+        bpy.ops.object.mode_set(mode ='EDIT')
+        eb = self.obj.data.edit_bones
+        
+        def_bones = []
+        for i,org in enumerate(org_bones):
+            if i < len(org_bones) - 1:
+                # Create segments if specified
+                for j in range( self.segments ):
+                    def_name = copy_bone(
+                        self.obj,
+                        org,
+                        make_deformer_name( strip_org(org) )
+                    )
+                    
+                    eb[ def_name ].length /= self.segments
+
+                    # If we have more than one segments, place the 2nd and
+                    # onwards on the tail of the previous bone
+                    if j > 0:
+                         put_bone(self.obj, def_name, eb[ def_bones[-1] ].tail)
+
+                    def_bones += [ def_name ]
+            else:        
+                def_name = make_deformer_name( strip_org(org) )
+                def_name = copy_bone( self.obj, org, def_name )
+                def_bones.append( def_name )
+
+        # Parent deform bones
+        for i,b in enumerate( def_bones ):
+            if i > 0: # For all bones but the first (which has no parent)
+                eb[b].parent      = eb[ def_bones[i-1] ] # to previous
+                eb[b].use_connect = True
+
+        # Constraint def to tweaks
+        for d,t in zip(def_bones, tweaks):
+            tidx = tweaks.index(t)
+
+            make_constraint( self, d, {
+                'constraint'  : 'COPY_TRANSFORMS',
+                'subtarget'   : t
+            })
+
+            if tidx != len(tweaks) - 1:
+                make_constraint( self, d, {
+                    'constraint'  : 'DAMPED_TRACK',
+                    'subtarget'   : tweaks[ tidx + 1 ],
+                })
+
+                make_constraint( self, d, {
+                    'constraint'  : 'STRETCH_TO',
+                    'subtarget'   : tweaks[ tidx + 1 ],
+                })
+
+        # Create bbone segments
+        for bone in bones['def'][:-1]:
+            self.obj.data.bones[bone].bbone_segments = 8
+
+        self.obj.data.bones[ bones['def'][0]  ].bbone_in  = 0.0
+        self.obj.data.bones[ bones['def'][-2] ].bbone_out = 0.0
+
+        # Rubber hose drivers
+        pb = self.obj.pose.bones
+        for i,t in enumerate( tweaks[1:-1] ):
+            # Create custom property on tweak bone to control rubber hose
+            name                = 'rubber_' + t 
+
+            if i == trunc( len( tweaks[1:-1] / 2 ) ):
+                pb[t][prop] = 0.0
+            else:
+                pb[t][prop] = 1.0
+
+            prop                = rna_idprop_ui_prop_get( t, name, create=True )
+            prop["min"]         = 0.0
+            prop["max"]         = 2.0
+            prop["soft_min"]    = 0.0
+            prop["soft_max"]    = 1.0
+            prop["description"] = name
+
+            defs = def_bones[i:i+1]
+            for i,d in enumerate(defs):
+                drv = ''
+                if i == 0:
+                    drv = self.obj.bones[d].driver_add("bbone_in").driver                
+                else:
+                    drv = self.obj.bones[d].driver_add("bbone_out").driver                
+
+                drv.type = 'SUM'
+                var = drv.variables.new()
+                var.name = name
+                var.type = "SINGLE_PROP"
+                var.targets[0].id = self.obj
+                var.targets[0].data_path = \
+                    t.path_from_id() + '[' + '"' + name + '"' + ']'
+
+        return def_bones
+        
+    def create_fk( self ):
+        pass
+        
+        retrun { 'ctrl' : ctrls, 'mch' : mch }
+
+        
+    def create_ik( self ):
+        
+        pass
+        
+        retrun { 'ctrl'       : ctrl, 
+                 'mch_ik'     : mch_ik, 
+                 'mch_target' : mch_target,
+                 'mch_str'    : mch_str
+        }
+    
+    def create_tweak( self ):
+        pass
+
+        return { 'ctrl' : ctrls, 'mch' : mchs }
+        
+
+    def generate( self ):
+        bpy.ops.object.mode_set(mode ='EDIT')
+        eb = self.obj.data.edit_bones
+
+        # Clear parents for org bones
+        for bone in self.org_bones:
+            eb[bone].use_connect = False
+            eb[bone].parent      = None
+            
+        bones = {}
+
+        # Create mch limb parent
+        
+
+        bones['tweak'] = self.create_tweak()                
+        bones['def']   = self.create_def( bones['tweak']['ctrl'] )
+        bones['fk']    = self.create_fk()
+        bones['ik']    = self.create_ik()
+
+        
+def add_parameters( params ):
+    """ Add the parameters of this rig type to the
+        RigifyParameters PropertyGroup
+    """
+
+    params.segments = bpy.props.IntProperty(
+        name        = 'bone segments',
+        default     = 2,
+        min         = 1,
+        description = 'Number of segments'
+    )
+
+    # Setting up extra layers for the FK and tweak
+    params.tweak_extra_layers = bpy.props.BoolProperty( 
+        name        = "tweak_extra_layers", 
+        default     = True, 
+        description = ""
+        )
+
+    params.tweak_layers = bpy.props.BoolVectorProperty(
+        size        = 32,
+        description = "Layers for the tweak controls to be on",
+        default     = tuple( [ i == 1 for i in range(0, 32) ] )
+        )
+
+
+def parameters_ui(layout, params):
+    """ Create the ui for the rig parameters."""
+    
+    r = layout.row()
+    r.prop(params, "neck_pos")
+
+    r = layout.row()
+    r.prop(params, "pivot_pos")
+
+    r = layout.row()
+    r.prop(params, "tail_pos")
+
+    r = layout.row()
+    r.prop(params, "tweak_extra_layers")
+    r.active = params.tweak_extra_layers
+    
+    col = r.column(align=True)
+    row = col.row(align=True)
+
+    for i in range(8):
+        row.prop(params, "tweak_layers", index=i, toggle=True, text="")
+
+    row = col.row(align=True)
+
+    for i in range(16,24):
+        row.prop(params, "tweak_layers", index=i, toggle=True, text="")
+
+    col = r.column(align=True)
+    row = col.row(align=True)
+
+    for i in range(8,16):
+        row.prop(params, "tweak_layers", index=i, toggle=True, text="")
+
+    row = col.row(align=True)
+
+    for i in range(24,32):
+        row.prop(params, "tweak_layers", index=i, toggle=True, text="")
