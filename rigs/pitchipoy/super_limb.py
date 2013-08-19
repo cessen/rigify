@@ -66,7 +66,7 @@ class Limb:
         eb = self.obj.data.edit_bones
 
         name = make_mechanism_name( 
-            strip_org(org_bones[0][:-2]) ) + '_parent' + org_bones[0][-2:]
+            strip_org( org_bones[0][:-2] ) + '_parent' + org_bones[0][-2:]
         )
 
         mch = copy_bone( self.obj, org_bones[0], name )
@@ -298,7 +298,7 @@ class Limb:
             for i,d in enumerate(defs):
                 drv = ''
                 if i == 0:
-                    drv = self.obj.bones[d].dself.obj, t, bone_transform_name=None)river_add("bbone_in").driver                
+                    drv = self.obj.bones[d].driver_add("bbone_in").driver                
                 else:
                     drv = self.obj.bones[d].driver_add("bbone_out").driver                
 
@@ -368,7 +368,7 @@ class Limb:
         pb[ ctrl ].lock_rotation = True, False, True
         create_ikarrow_widget( self.obj, ctrl, bone_transform_name=None )
         
-        retrun { 'ctrl'       : ctrl, 
+        return { 'ctrl'       : ctrl, 
                  'mch_ik'     : mch_ik, 
                  'mch_target' : mch_target,
                  'mch_str'    : mch_str
@@ -423,7 +423,7 @@ class Limb:
 
         create_circle_widget(self.obj, ctrls[2], radius=0.4, head_tail=0.0)
         
-        retrun { 'ctrl' : ctrls, 'mch' : mch }
+        return { 'ctrl' : ctrls, 'mch' : mch }
         
 
     def generate( self ):

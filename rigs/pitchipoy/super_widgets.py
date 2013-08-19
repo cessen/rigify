@@ -96,3 +96,17 @@ def create_face_widget(rig, bone_name, size=1.0, bone_transform_name=None):
         return None
 
 
+def create_ikarrow_widget(rig, bone_name, size=1.0, bone_transform_name=None):
+    obj = create_widget(rig, bone_name, bone_transform_name)
+    if obj != None:
+        verts = [(0.10000000149011612*size, 0.0*size, -0.30000001192092896*size), (0.10000000149011612*size, 0.699999988079071*size, -0.30000001192092896*size), (-0.10000000149011612*size, 0.0*size, -0.30000001192092896*size), (-0.10000000149011612*size, 0.699999988079071*size, -0.30000001192092896*size), (0.20000000298023224*size, 0.699999988079071*size, -0.30000001192092896*size), (0.0*size, 1.0*size, -0.30000001192092896*size), (-0.20000000298023224*size, 0.699999988079071*size, -0.30000001192092896*size), (0.10000000149011612*size, 0.0*size, 0.30000001192092896*size), (0.10000000149011612*size, 0.699999988079071*size, 0.30000001192092896*size), (-0.10000000149011612*size, 0.0*size, 0.30000001192092896*size), (-0.10000000149011612*size, 0.699999988079071*size, 0.30000001192092896*size), (0.20000000298023224*size, 0.699999988079071*size, 0.30000001192092896*size), (0.0*size, 1.0*size, 0.30000001192092896*size), (-0.20000000298023224*size, 0.699999988079071*size, 0.30000001192092896*size), ]
+        edges = [(0, 1), (2, 3), (1, 4), (4, 5), (3, 6), (5, 6), (0, 2), (7, 8), (9, 10), (8, 11), (11, 12), (10, 13), (12, 13), (7, 9), ]
+        faces = []
+
+        mesh = obj.data
+        mesh.from_pydata(verts, edges, faces)
+        mesh.update()
+        return obj
+    else:
+        return None
+
