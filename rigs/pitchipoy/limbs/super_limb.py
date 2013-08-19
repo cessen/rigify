@@ -1,13 +1,14 @@
 import bpy
-from mathutils   import Vector
-from ...utils    import copy_bone, flip_bone, put_bone, org
-from ...utils    import strip_org, make_deformer_name, connected_children_names 
-from ...utils    import create_circle_widget, create_sphere_widget, create_widget
-from ...utils    import MetarigError, make_mechanism_name, create_cube_widget
-from rna_prop_ui import rna_idprop_ui_prop_get
-from math        import trunc
+from mathutils       import Vector
+from ....utils       import copy_bone, flip_bone, put_bone, org
+from ....utils       import strip_org, make_deformer_name, connected_children_names 
+from ....utils       import create_circle_widget, create_sphere_widget, create_widget
+from ....utils       import MetarigError, make_mechanism_name, create_cube_widget
+from rna_prop_ui     import rna_idprop_ui_prop_get
+from ..super_widgets import create_ikarrow_widget
+from math            import trunc
 
-def orient_bone( cls, eb, axis, scale, reverse = False ):
+def orient_bone( cls, eb, axis, scale = 1.0, reverse = False ):
     v = Vector((0,0,0))
    
     setattr(v,axis,scale)
@@ -45,6 +46,7 @@ class Limb:
             )[:2]  # The basic limb is the first 3 bones
 
         self.segments = params.segments
+        self.rot_axis = params.rotation_axis
 
         # Assign values to tweak/FK layers props if opted by user
         if params.tweak_extra_layers:
@@ -56,6 +58,35 @@ class Limb:
             self.fk_layers = list(params.fk_layers)
         else:
             self.fk_layers = None
+
+    def create_parent( self ):
+        org_bones = self.org_bones
+        
+        bpy.ops.object.mode_set(mode ='EDIT')
+        eb = self.obj.data.edit_bones
+
+        name = make_mechanism_name( 
+            strip_org(org_bones[0][:-2]) ) + '_parent' + org_bones[0][-2:]
+        )
+
+        mch = copy_bone( self.obj, org_bones[0], name )
+        orient_bone( self, eb[mch], 'y' )
+        eb[ mch ].length = eb[ org_bones[0] ].length / 4
+
+        eb[ mch ].parent = None # Goes to root later
+        
+        # Constraints
+        make_constraint( self, mch, {
+            'constraint'  : 'COPY_ROTATION',
+            'subtarget'   : self.obj.pose.bones[0] # root
+        })
+
+        make_constraint( self, mch, {
+            'constraint'  : 'COPY_SCALE',
+            'subtarget'   : self.obj.pose.bones[0] # root
+        })
+
+        return mch
 
     def create_tweak( self ):
         org_bones = self.org_bones
@@ -249,7 +280,7 @@ class Limb:
         pb = self.obj.pose.bones
         for i,t in enumerate( tweaks['ctrl'][1:-1] ):
             # Create custom property on tweak bone to control rubber hose
-            name                = 'rubber_' + t 
+            name = 'rubber_' + t 
 
             if i == trunc( len( tweaks['ctrl'][1:-1] / 2 ) ):
                 pb[t][prop] = 0.0
@@ -267,7 +298,7 @@ class Limb:
             for i,d in enumerate(defs):
                 drv = ''
                 if i == 0:
-                    drv = self.obj.bones[d].driver_add("bbone_in").driver                
+                    drv = self.obj.bones[d].dself.obj, t, bone_transform_name=None)river_add("bbone_in").driver                
                 else:
                     drv = self.obj.bones[d].driver_add("bbone_out").driver                
 
@@ -281,15 +312,61 @@ class Limb:
 
         return def_bones
         
-    def create_fk( self ):
-        pass
         
-        retrun { 'ctrl' : ctrls, 'mch' : mch }
+    def create_ik( self, parent ):
+        org_bones = self.org_bones
+        
+        bpy.ops.object.mode_set(mode ='EDIT')
+        eb = self.obj.data.edit_bones
 
+        ctrl       = strip_org( org_bones[0] ) + '_ik'
+        mch_ik     = make_mechanism_name( 'ik' )
+        mch_target = make_mechanism_name( 'ik_target' )
+
+        for o, ik in zip( org_bones, [ ctrl, mch_ik, mch_target ] ):
+            bone = copy_bone( self.obj, o, ik )
+
+            if org_bones.index(0) == len( org_bones ) - 1:
+                eb[ bone ].length /= 4
+
+        # Create MCH Stretch
+        mch_str = copy_bone( 
+            self.obj, 
+            org_bones[0],
+            make_mechanism_name( strip_org( org_bones[0] ) ) + '_str'
+        )
+
+        eb[ mch_str ].tail = eb[ org_bones[-1] ].head
         
-    def create_ik( self ):
+        # Parenting
+        eb[ ctrl       ].parent = eb[ parent ]
+        eb[ mch_str    ].parent = eb[ parent ]
+        eb[ mch_ik     ].parent = eb[ ctrl   ]
         
-        pass
+        
+        make_constraint( self, mch_ik, {
+            'constraint'  : 'IK',
+            'subtarget'   : mch_target,
+            'chain_count' : 2,
+        })
+
+        pb = self.obj.pose.bones
+        pb[ mch_ik ].ik_stretch = 0.1
+
+        # IK constraint Rotation locks
+        for axis in ['x','y','z']:
+            if axis != self.rot_axis:
+               setattr( pb[ mch_ik ], 'lock_ik_' + axis, True )
+
+        make_constraint( self, mch_target, {
+            'constraint'  : 'COPY_LOCATION',
+            'subtarget'   : mch_stretch,
+            'head_tail'   : 1.0,
+        })
+
+        # Locks and Widget
+        pb[ ctrl ].lock_rotation = True, False, True
+        create_ikarrow_widget( self.obj, ctrl, bone_transform_name=None )
         
         retrun { 'ctrl'       : ctrl, 
                  'mch_ik'     : mch_ik, 
@@ -298,6 +375,55 @@ class Limb:
         }
     
 
+    def create_fk( self, parent ):
+        org_bones = self.org_bones
+        
+        bpy.ops.object.mode_set(mode ='EDIT')
+        eb = self.obj.data.edit_bones
+
+        ctrls = []        
+
+        for o in org_bones:
+            bone = copy_bone( self.obj, o, strip_org(o) + '_fk' )
+            ctrls.append( bone )
+            
+        # MCH
+        mch = copy_bone( 
+            self.obj, 
+            org_bones[-1], 
+            make_mechanism_name(strip_org(o)) + '_fk' 
+        )
+
+        eb[ mch ].length /= 4
+        
+        # Parenting
+        eb[ ctrls[0] ].parent      = eb[ parent   ]
+        eb[ ctrls[1] ].parent      = eb[ ctrls[0] ]
+        eb[ ctrls[1] ].use_connect = True
+        eb[ ctrls[2] ].parent      = eb[ mch      ]
+        eb[ mch      ].parent      = eb[ ctrls[1] ]
+        eb[ mch      ].use_connect = True
+
+        # Constrain MCH's scale to root
+        make_constraint( self, mch, {
+            'constraint'  : 'COPY_SCALE',
+            'subtarget'   : self.obj.pose.bones[0] # root
+        })
+        
+        # Locks and widgets
+        pb = self.obj.pose.bones
+        pb[ ctrls[2] ].lock_location = True, True, True
+
+        create_circle_widget(
+            self.obj, ctrls[0], radius=0.3, head_tail=0.5, with_line=True
+        )
+        create_circle_widget(
+            self.obj, ctrls[1], radius=0.3, head_tail=0.5, with_line=True
+        )
+
+        create_circle_widget(self.obj, ctrls[2], radius=0.4, head_tail=0.0)
+        
+        retrun { 'ctrl' : ctrls, 'mch' : mch }
         
 
     def generate( self ):
@@ -312,18 +438,29 @@ class Limb:
         bones = {}
 
         # Create mch limb parent
+        bones['parent'] = self.create_parent()
+        bones['tweak']  = self.create_tweak()                
+        bones['def']    = self.create_def( bones['tweak']['ctrl'] )
+        bones['ik']     = self.create_ik(  bones['parent']        )
+        bones['fk']     = self.create_fk(  bones['parent']        )
         
-
-        bones['tweak'] = self.create_tweak()                
-        bones['def']   = self.create_def( bones['tweak']['ctrl'] )
-        bones['fk']    = self.create_fk()
-        bones['ik']    = self.create_ik()
-
+        return bones
         
 def add_parameters( params ):
     """ Add the parameters of this rig type to the
         RigifyParameters PropertyGroup
     """
+
+    items = [
+        ('x', 'X', ''), 
+        ('y', 'Y', ''), 
+        ('z', 'Z', '')
+    ]
+    params.rotation_axis = bpy.props.EnumProperty(
+        items   = items, 
+        name    = "Rotation Axis", 
+        default = 'lock_ik_x'
+    )
 
     params.segments = bpy.props.IntProperty(
         name        = 'bone segments',
@@ -361,15 +498,12 @@ def add_parameters( params ):
 
 def parameters_ui(layout, params):
     """ Create the ui for the rig parameters."""
-    
+   
     r = layout.row()
-    r.prop(params, "neck_pos")
+    r.prop(params, "rotation_axis")
 
     r = layout.row()
-    r.prop(params, "pivot_pos")
-
-    r = layout.row()
-    r.prop(params, "tail_pos")
+    r.prop(params, "segments")
 
     for layer in [ 'tweak', 'fk' ]:
         r = layout.row()
