@@ -107,6 +107,8 @@ class Rig:
 
         eb[ mch ].parent = None # Goes to root later
         
+        eb[ mch ].roll = 0.0
+        
         # Constraints
         make_constraint( self, mch, {
             'constraint'  : 'COPY_ROTATION',
@@ -319,25 +321,27 @@ class Rig:
             prop["soft_max"]    = 1.0
             prop["description"] = name
 
-            defs = def_bones[i:i+1]
-            for j,d in enumerate(defs):
-                drv = ''
-                if j == 0:
-                    drv = self.obj.data.bones[d].driver_add("bbone_out").driver
-                elif j == len( tweaks ) -1:
-                    drv = self.obj.data.bones[d].driver_add("bbone_in").driver
-                else:
-                    drv = self.obj.data.bones[d].driver_add("bbone_in").driver
-                    drv = self.obj.data.bones[d].driver_add("bbone_out").driver
+        for j,d in enumerate(def_bones[:-1]):
+            drvs = {}
+            if j != 0:
+                tidx = j
+                drvs[tidx] = self.obj.data.bones[d].driver_add("bbone_in").driver
 
+            if j != len( def_bones[:-1] ) - 1:
+                tidx = j + 1
+                drvs[tidx] = self.obj.data.bones[d].driver_add("bbone_out").driver
+
+            for d in drvs:
+                drv = drvs[d]
+                name = 'rubber_' + tweaks[d]
                 drv.type = 'SUM'
                 var = drv.variables.new()
                 var.name = name
                 var.type = "SINGLE_PROP"
                 var.targets[0].id = self.obj
-                var.targets[0].data_path = \
-                    pb[t].path_from_id() + '[' + '"' + name + '"' + ']'
-
+                var.targets[0].data_path = pb[tweaks[d]].path_from_id() + \
+                                           '[' + '"' + name + '"' + ']'
+                       
         return def_bones
         
         
@@ -548,7 +552,7 @@ def add_parameters( params ):
     
     params.bbones = bpy.props.IntProperty(
         name        = 'bbone segments',
-        default     = 5,
+        default     = 10,
         min         = 1,
         description = 'Number of segments'
     )
@@ -588,6 +592,9 @@ def parameters_ui(layout, params):
 
     r = layout.row()
     r.prop(params, "segments")
+
+    r = layout.row()
+    r.prop(params, "bbones")
 
     for layer in [ 'tweak', 'fk' ]:
         r = layout.row()
