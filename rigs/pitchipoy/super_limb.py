@@ -9,6 +9,9 @@ from rna_prop_ui    import rna_idprop_ui_prop_get
 from .super_widgets import create_ikarrow_widget
 from math           import trunc
 
+script             = ""
+bilateral_suffixes = ['.L','.R']
+
 def orient_bone( cls, eb, axis, scale = 1.0, reverse = False ):
     v = Vector((0,0,0))
    
@@ -36,7 +39,24 @@ def make_constraint( cls, bone, constraint ):
     for p in [ k for k in constraint.keys() if k in dir(const) ]:
         setattr( const, p, constraint[p] )
 
-script = ""
+def get_bone_name( name, btype, suffix = '' ):
+    types = {
+        'mch'  : make_mechanism_name( name ),
+        'org'  : org( name ),
+        'def'  : make_deformer_name( name )
+        'ctrl' : name
+    }
+
+    name = types[btype]
+
+    if suffix:
+        name = name + '_' + suffix
+
+        if [ s for s in bilateral_suffixes if s in org_bones[0] ]:
+            name = name[:-2] + '_' + suffix + name[-2:]
+
+    return name
+
 
 class Rig:
     def __init__(self, obj, bone_name, params):
@@ -67,9 +87,7 @@ class Rig:
         bpy.ops.object.mode_set(mode ='EDIT')
         eb = self.obj.data.edit_bones
 
-        name = make_mechanism_name( 
-            strip_org( org_bones[0][:-2] ) + '_parent' + org_bones[0][-2:]
-        )
+        name = get_bone_name( strip_org( org_bones[0] ), 'mch', 'parent' )
 
         mch = copy_bone( self.obj, org_bones[0], name )
         orient_bone( self, eb[mch], 'y' )
@@ -106,18 +124,12 @@ class Rig:
                 # Create segments if specified
                 for j in range( self.segments ):
                     # MCH
-                    mch = copy_bone(
-                        self.obj,
-                        org,
-                        make_mechanism_name( strip_org(org) )
-                    )
+                    name = get_bone_name( strip_org(org), 'mch', 'tweak' )
+                    mch = copy_bone( self.obj, org, name )
                     
                     # CTRL
-                    ctrl = copy_bone(
-                        self.obj,
-                        org,
-                        strip_org(org)
-                    )
+                    name = get_bone_name( strip_org(org), 'ctrl', 'tweak' )
+                    ctrl = copy_bone( self.obj, org, name )
                     
                     eb[ mch  ].length /= self.segments
                     eb[ ctrl ].length /= self.segments
@@ -127,7 +139,7 @@ class Rig:
                     if j > 0:
                         put_bone(self.obj, mch,  eb[ tweaks['mch' ][-1] ].tail)
                         put_bone(self.obj, ctrl, eb[ tweaks['ctrl'][-1] ].tail)
-                        
+
                     tweaks['ctrl'] += [ ctrl ]
                     tweaks['mch' ] += [ mch  ]
 
@@ -135,9 +147,9 @@ class Rig:
                     eb[ mch  ].parent = eb[ org ]
                     eb[ ctrl ].parent = eb[ mch ]
 
-            else: # Last limb bone - is not subdivided        
-                mch = make_mechanism_name( strip_org(org) )
-                mch = copy_bone( self.obj, org_bones[i-1], mch )
+            else: # Last limb bone - is not subdivided  
+                name = get_bone_name( strip_org(org), 'mch', 'tweak' )      
+                mch = copy_bone( self.obj, org_bones[i-1], name )
                 eb[ mch ].length = eb[org].length / 4
                 put_bone(
                     self.obj, 
@@ -155,6 +167,11 @@ class Rig:
                 # Parenting the tweak ctrls to mchs
                 eb[ mch  ].parent = eb[ org ]
                 eb[ ctrl ].parent = eb[ mch ]
+
+        # Scale to reduce widget size and maintain conventions!
+        for mch, ctrl in zip( tweaks['mch'], tweaks['ctrl'] ):
+            eb[ mch  ].length /= 4
+            eb[ ctrl ].length /= 2
 
         # Contraints
         for i,b in enumerate( tweaks['mch'] ):
@@ -220,11 +237,8 @@ class Rig:
             if i < len(org_bones) - 1:
                 # Create segments if specified
                 for j in range( self.segments ):
-                    def_name = copy_bone(
-                        self.obj,
-                        org,
-                        make_deformer_name( strip_org(org) )
-                    )
+                    name = get_bone_name( strip_org(org), 'def' )
+                    def_name = copy_bone( self.obj, org, name )
                     
                     eb[ def_name ].length /= self.segments
 
@@ -234,9 +248,9 @@ class Rig:
                          put_bone(self.obj, def_name, eb[ def_bones[-1] ].tail)
 
                     def_bones += [ def_name ]
-            else:        
-                def_name = make_deformer_name( strip_org(org) )
-                def_name = copy_bone( self.obj, org, def_name )
+            else:
+                name     = get_bone_name( strip_org(org), 'def' )
+                def_name = copy_bone( self.obj, org, name )
                 def_bones.append( def_name )
 
         # Parent deform bones
@@ -315,15 +329,9 @@ class Rig:
         bpy.ops.object.mode_set(mode ='EDIT')
         eb = self.obj.data.edit_bones
 
-        ctrl = strip_org( org_bones[0][:-2] ) + '_ik' + org_bones[0][-2:]
-
-        mch_ik = make_mechanism_name( 
-            strip_org( org_bones[1][:-2] )
-        ) + '_ik' + org_bones[1][-2:]
-        
-        mch_target = make_mechanism_name( 
-            strip_org( org_bones[2][:-2] ) + 'ik_target' 
-        ) + org_bones[2][-2:]
+        ctrl_ik    = get_bone_name( org_bones[0], 'ctrl', 'ik'        )
+        mch_ik     = get_bone_name( org_bones[0], 'mch',  'ik'        )
+        mch_target = get_bone_name( org_bones[0], 'mch',  'ik_target' )
 
         for o, ik in zip( org_bones, [ ctrl, mch_ik, mch_target ] ):
             bone = copy_bone( self.obj, o, ik )
@@ -335,7 +343,7 @@ class Rig:
         mch_str = copy_bone( 
             self.obj, 
             org_bones[0],
-            make_mechanism_name( strip_org( org_bones[0] ) ) + '_str'
+            get_bone_name( org_bones[0], 'mch', 'ik_stretch' )
         )
 
         eb[ mch_str ].tail = eb[ org_bones[-1] ].head
@@ -386,14 +394,12 @@ class Rig:
         ctrls = []        
 
         for o in org_bones:
-            bone = copy_bone( self.obj, o, strip_org(o) + '_fk' )
+            bone = copy_bone( self.obj, o, get_bone_name( o, 'ctrl', 'fk' ) )
             ctrls.append( bone )
-            
+ 
         # MCH
         mch = copy_bone( 
-            self.obj, 
-            org_bones[-1], 
-            make_mechanism_name(strip_org(o)) + '_fk' 
+            self.obj, org_bones[-1], get_bone_name( o, 'mch', 'fk' )
         )
 
         eb[ mch ].length /= 4
@@ -420,7 +426,11 @@ class Rig:
         create_limb_widget( self.obj, ctrls[1] )
 
         create_circle_widget(self.obj, ctrls[2], radius=0.4, head_tail=0.0)
-        
+
+        for c in ctrls:
+            if self.fk_layers:
+                pb[c].bone.layers = self.fk_layers
+
         return { 'ctrl' : ctrls, 'mch' : mch }
         
 
