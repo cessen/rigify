@@ -384,6 +384,7 @@ class Rig:
 
         pb = self.obj.pose.bones
         pb[ mch_ik ].ik_stretch = 0.1
+        pb[ ctrl   ].ik_stretch = 0.1
 
         # IK constraint Rotation locks
         for axis in ['x','y','z']:
