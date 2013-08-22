@@ -1,4 +1,4 @@
-import bpy
+import bpy, re
 from mathutils      import Vector
 from ...utils       import copy_bone, flip_bone, put_bone, org
 from ...utils       import strip_org, make_deformer_name, create_widget
@@ -40,20 +40,31 @@ def make_constraint( cls, bone, constraint ):
         setattr( const, p, constraint[p] )
 
 def get_bone_name( name, btype, suffix = '' ):
+    # RE pattern match right or left parts
+    # match the letter "L" (or "R"), followed by an optional dot (".") 
+    # and 0 or more digits at the end of the the string
+    pattern = r'^(\S+)(\.\S+)$' 
+
+    name = strip_org( name )
+
     types = {
         'mch'  : make_mechanism_name( name ),
         'org'  : org( name ),
-        'def'  : make_deformer_name( name )
+        'def'  : make_deformer_name( name ),
         'ctrl' : name
     }
 
     name = types[btype]
 
     if suffix:
-        name = name + '_' + suffix
-
-        if [ s for s in bilateral_suffixes if s in org_bones[0] ]:
-            name = name[:-2] + '_' + suffix + name[-2:]
+        results = re.match( pattern,  name )
+        bname, addition = ('','')
+        
+        if results:
+            bname, addition = results.groups()
+            name = bname + "_" + suffix + addition
+        else:
+            name = name  + "_" + suffix
 
     return name
 
@@ -68,6 +79,7 @@ class Rig:
             )[:3]  # The basic limb is the first 3 bones
 
         self.segments = params.segments
+        self.bbones   = params.bbones
         self.rot_axis = params.rotation_axis
 
         # Assign values to tweak/FK layers props if opted by user
@@ -281,7 +293,7 @@ class Rig:
 
         # Create bbone segments
         for bone in def_bones[:-1]:
-            self.obj.data.bones[bone].bbone_segments = 8
+            self.obj.data.bones[bone].bbone_segments = self.bbones
 
         self.obj.data.bones[ def_bones[0]  ].bbone_in  = 0.0
         self.obj.data.bones[ def_bones[-2] ].bbone_out = 0.0
@@ -297,7 +309,10 @@ class Rig:
             else:
                 pb[t][name] = 1.0
 
-            prop                = rna_idprop_ui_prop_get( pb[t], name, create=True )
+            prop                = rna_idprop_ui_prop_get( 
+                                    pb[t], name, create=True
+                                  )
+                                  
             prop["min"]         = 0.0
             prop["max"]         = 2.0
             prop["soft_min"]    = 0.0
@@ -305,12 +320,15 @@ class Rig:
             prop["description"] = name
 
             defs = def_bones[i:i+1]
-            for i,d in enumerate(defs):
+            for j,d in enumerate(defs):
                 drv = ''
-                if i == 0:
-                    drv = self.obj.data.bones[d].driver_add("bbone_in").driver                
+                if j == 0:
+                    drv = self.obj.data.bones[d].driver_add("bbone_out").driver
+                elif j == len( tweaks ) -1:
+                    drv = self.obj.data.bones[d].driver_add("bbone_in").driver
                 else:
-                    drv = self.obj.data.bones[d].driver_add("bbone_out").driver                
+                    drv = self.obj.data.bones[d].driver_add("bbone_in").driver
+                    drv = self.obj.data.bones[d].driver_add("bbone_out").driver
 
                 drv.type = 'SUM'
                 var = drv.variables.new()
@@ -329,7 +347,7 @@ class Rig:
         bpy.ops.object.mode_set(mode ='EDIT')
         eb = self.obj.data.edit_bones
 
-        ctrl_ik    = get_bone_name( org_bones[0], 'ctrl', 'ik'        )
+        ctrl       = get_bone_name( org_bones[0], 'ctrl', 'ik'        )
         mch_ik     = get_bone_name( org_bones[0], 'mch',  'ik'        )
         mch_target = get_bone_name( org_bones[0], 'mch',  'ik_target' )
 
@@ -349,9 +367,9 @@ class Rig:
         eb[ mch_str ].tail = eb[ org_bones[-1] ].head
         
         # Parenting
-        eb[ ctrl       ].parent = eb[ parent ]
-        eb[ mch_str    ].parent = eb[ parent ]
-        eb[ mch_ik     ].parent = eb[ ctrl   ]
+        eb[ ctrl    ].parent = eb[ parent ]
+        eb[ mch_str ].parent = eb[ parent ]
+        eb[ mch_ik  ].parent = eb[ ctrl   ]
         
         
         make_constraint( self, mch_ik, {
@@ -522,8 +540,15 @@ def add_parameters( params ):
     )
 
     params.segments = bpy.props.IntProperty(
-        name        = 'bone segments',
+        name        = 'limb segments',
         default     = 2,
+        min         = 1,
+        description = 'Number of segments'
+    )
+    
+    params.bbones = bpy.props.IntProperty(
+        name        = 'bbone segments',
+        default     = 5,
         min         = 1,
         description = 'Number of segments'
     )
