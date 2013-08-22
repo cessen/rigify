@@ -1,12 +1,13 @@
 import bpy
-from mathutils       import Vector
-from ....utils       import copy_bone, flip_bone, put_bone, org
-from ....utils       import strip_org, make_deformer_name, connected_children_names 
-from ....utils       import create_circle_widget, create_sphere_widget, create_widget
-from ....utils       import MetarigError, make_mechanism_name, create_cube_widget
-from rna_prop_ui     import rna_idprop_ui_prop_get
-from ..super_widgets import create_ikarrow_widget
-from math            import trunc
+from mathutils      import Vector
+from ...utils       import copy_bone, flip_bone, put_bone, org
+from ...utils       import strip_org, make_deformer_name, create_widget
+from ...utils       import create_circle_widget, create_sphere_widget
+from ...utils       import MetarigError, make_mechanism_name, create_cube_widget
+from ...utils       import create_limb_widget, connected_children_names
+from rna_prop_ui    import rna_idprop_ui_prop_get
+from .super_widgets import create_ikarrow_widget
+from math           import trunc
 
 def orient_bone( cls, eb, axis, scale = 1.0, reverse = False ):
     v = Vector((0,0,0))
@@ -35,15 +36,16 @@ def make_constraint( cls, bone, constraint ):
     for p in [ k for k in constraint.keys() if k in dir(const) ]:
         setattr( const, p, constraint[p] )
 
+script = ""
 
-class Limb:
+class Rig:
     def __init__(self, obj, bone_name, params):
         """ Initialize torso rig and key rig properties """
         self.obj       = obj
         self.params    = params
         self.org_bones = list(
             [bone_name] + connected_children_names(obj, bone_name)
-            )[:2]  # The basic limb is the first 3 bones
+            )[:3]  # The basic limb is the first 3 bones
 
         self.segments = params.segments
         self.rot_axis = params.rotation_axis
@@ -78,12 +80,12 @@ class Limb:
         # Constraints
         make_constraint( self, mch, {
             'constraint'  : 'COPY_ROTATION',
-            'subtarget'   : self.obj.pose.bones[0] # root
+            'subtarget'   : 'root'
         })
 
         make_constraint( self, mch, {
             'constraint'  : 'COPY_SCALE',
-            'subtarget'   : self.obj.pose.bones[0] # root
+            'subtarget'   : 'root'
         })
 
         return mch
@@ -110,8 +112,6 @@ class Limb:
                         make_mechanism_name( strip_org(org) )
                     )
                     
-                    eb[ mch ].length /= self.segments * 4
-
                     # CTRL
                     ctrl = copy_bone(
                         self.obj,
@@ -119,23 +119,15 @@ class Limb:
                         strip_org(org)
                     )
                     
-                    eb[ ctrl ].length /= self.segments * 2
+                    eb[ mch  ].length /= self.segments
+                    eb[ ctrl ].length /= self.segments
 
                     # If we have more than one segments, place the head of the 
                     # 2nd and onwards at the correct position
                     if j > 0:
-                        put_bone(
-                            self.obj, 
-                            mch,
-                            eb[org].head + i * eb[org].length / self.segments
-                        )
-
-                        put_bone(
-                            self.obj, 
-                            ctrl,
-                            eb[org].head + i * eb[org].length / self.segments
-                        )
-
+                        put_bone(self.obj, mch,  eb[ tweaks['mch' ][-1] ].tail)
+                        put_bone(self.obj, ctrl, eb[ tweaks['ctrl'][-1] ].tail)
+                        
                     tweaks['ctrl'] += [ ctrl ]
                     tweaks['mch' ] += [ mch  ]
 
@@ -173,14 +165,18 @@ class Limb:
             if i == first or i == middle or i == last:
                 make_constraint( self, b, {
                     'constraint'  : 'COPY_SCALE',
-                    'subtarget'   : self.obj.pose.bones[0] # root
+                    'subtarget'   : 'root'
                 })
             else:
-                targets = []
-                if i < trunc( len( tweaks['mch'] ) / 2 ):
+                targets       = []
+                dt_target_idx = middle
+                factor        = 0
+                if i < middle:
                     targets = [first,middle]
                 else:
-                    targets = [middle,last]
+                    targets       = [middle,last]
+                    factor        = self.segments
+                    dt_target_idx = last
 
                 # Use copy transforms constraints to position each bone
                 # exactly in the location respective to its index (between
@@ -192,12 +188,12 @@ class Limb:
                 make_constraint( self, b, {
                     'constraint'  : 'COPY_TRANSFORMS',
                     'subtarget'   : tweaks['ctrl'][targets[1]],
-                    'influence'   : i / self.segments
+                    'influence'   : (i - factor) / self.segments
                 })
-                make_constraint( self, d, {
+                make_constraint( self, b, {
                     'constraint'  : 'DAMPED_TRACK',
-                    'subtarget'   : tweaks['ctrl'][i+1],
-                })                
+                    'subtarget'   : tweaks['ctrl'][ dt_target_idx ],
+                })
 
         # Ctrl bones Locks and Widgets
         pb = self.obj.pose.bones
@@ -250,44 +246,44 @@ class Limb:
                 eb[b].use_connect = True
 
         # Constraint def to tweaks
-        for d,t in zip(def_bones, tweaks['ctrl']):
-            tidx = tweaks['ctrl'].index(t)
+        for d,t in zip(def_bones, tweaks):
+            tidx = tweaks.index(t)
 
             make_constraint( self, d, {
                 'constraint'  : 'COPY_TRANSFORMS',
                 'subtarget'   : t
             })
 
-            if tidx != len(tweaks['ctrl']) - 1:
+            if tidx != len(tweaks) - 1:
                 make_constraint( self, d, {
                     'constraint'  : 'DAMPED_TRACK',
-                    'subtarget'   : tweaks['ctrl'][ tidx + 1 ],
+                    'subtarget'   : tweaks[ tidx + 1 ],
                 })
 
                 make_constraint( self, d, {
                     'constraint'  : 'STRETCH_TO',
-                    'subtarget'   : tweaks['ctrl'][ tidx + 1 ],
+                    'subtarget'   : tweaks[ tidx + 1 ],
                 })
 
         # Create bbone segments
-        for bone in bones['def'][:-1]:
+        for bone in def_bones[:-1]:
             self.obj.data.bones[bone].bbone_segments = 8
 
-        self.obj.data.bones[ bones['def'][0]  ].bbone_in  = 0.0
-        self.obj.data.bones[ bones['def'][-2] ].bbone_out = 0.0
+        self.obj.data.bones[ def_bones[0]  ].bbone_in  = 0.0
+        self.obj.data.bones[ def_bones[-2] ].bbone_out = 0.0
 
         # Rubber hose drivers
         pb = self.obj.pose.bones
-        for i,t in enumerate( tweaks['ctrl'][1:-1] ):
+        for i,t in enumerate( tweaks[1:-1] ):
             # Create custom property on tweak bone to control rubber hose
             name = 'rubber_' + t 
 
-            if i == trunc( len( tweaks['ctrl'][1:-1] / 2 ) ):
-                pb[t][prop] = 0.0
+            if i == trunc( len( tweaks[1:-1] ) / 2 ):
+                pb[t][name] = 0.0
             else:
-                pb[t][prop] = 1.0
+                pb[t][name] = 1.0
 
-            prop                = rna_idprop_ui_prop_get( t, name, create=True )
+            prop                = rna_idprop_ui_prop_get( pb[t], name, create=True )
             prop["min"]         = 0.0
             prop["max"]         = 2.0
             prop["soft_min"]    = 0.0
@@ -298,9 +294,9 @@ class Limb:
             for i,d in enumerate(defs):
                 drv = ''
                 if i == 0:
-                    drv = self.obj.bones[d].driver_add("bbone_in").driver                
+                    drv = self.obj.data.bones[d].driver_add("bbone_in").driver                
                 else:
-                    drv = self.obj.bones[d].driver_add("bbone_out").driver                
+                    drv = self.obj.data.bones[d].driver_add("bbone_out").driver                
 
                 drv.type = 'SUM'
                 var = drv.variables.new()
@@ -308,7 +304,7 @@ class Limb:
                 var.type = "SINGLE_PROP"
                 var.targets[0].id = self.obj
                 var.targets[0].data_path = \
-                    t.path_from_id() + '[' + '"' + name + '"' + ']'
+                    pb[t].path_from_id() + '[' + '"' + name + '"' + ']'
 
         return def_bones
         
@@ -319,14 +315,20 @@ class Limb:
         bpy.ops.object.mode_set(mode ='EDIT')
         eb = self.obj.data.edit_bones
 
-        ctrl       = strip_org( org_bones[0] ) + '_ik'
-        mch_ik     = make_mechanism_name( 'ik' )
-        mch_target = make_mechanism_name( 'ik_target' )
+        ctrl = strip_org( org_bones[0][:-2] ) + '_ik' + org_bones[0][-2:]
+
+        mch_ik = make_mechanism_name( 
+            strip_org( org_bones[1][:-2] )
+        ) + '_ik' + org_bones[1][-2:]
+        
+        mch_target = make_mechanism_name( 
+            strip_org( org_bones[2][:-2] ) + 'ik_target' 
+        ) + org_bones[2][-2:]
 
         for o, ik in zip( org_bones, [ ctrl, mch_ik, mch_target ] ):
             bone = copy_bone( self.obj, o, ik )
 
-            if org_bones.index(0) == len( org_bones ) - 1:
+            if org_bones.index(o) == len( org_bones ) - 1:
                 eb[ bone ].length /= 4
 
         # Create MCH Stretch
@@ -360,8 +362,8 @@ class Limb:
 
         make_constraint( self, mch_target, {
             'constraint'  : 'COPY_LOCATION',
-            'subtarget'   : mch_stretch,
-            'head_tail'   : 1.0,
+            'subtarget'   : mch_str,
+            'head_tail'   : 1.0
         })
 
         # Locks and Widget
@@ -407,24 +409,67 @@ class Limb:
         # Constrain MCH's scale to root
         make_constraint( self, mch, {
             'constraint'  : 'COPY_SCALE',
-            'subtarget'   : self.obj.pose.bones[0] # root
+            'subtarget'   : 'root'
         })
         
         # Locks and widgets
         pb = self.obj.pose.bones
         pb[ ctrls[2] ].lock_location = True, True, True
 
-        create_circle_widget(
-            self.obj, ctrls[0], radius=0.3, head_tail=0.5, with_line=True
-        )
-        create_circle_widget(
-            self.obj, ctrls[1], radius=0.3, head_tail=0.5, with_line=True
-        )
+        create_limb_widget( self.obj, ctrls[0] )
+        create_limb_widget( self.obj, ctrls[1] )
 
         create_circle_widget(self.obj, ctrls[2], radius=0.4, head_tail=0.0)
         
         return { 'ctrl' : ctrls, 'mch' : mch }
         
+
+    def org_parenting_and_switch( self, org, ik, fk, parent ):
+        bpy.ops.object.mode_set(mode ='EDIT')
+        eb = self.obj.data.edit_bones
+        # re-parent ORGs in a connected chain
+        for i,o in enumerate(org):
+            if i > 0:
+                eb[o].parent = eb[ org[i-1] ]
+                if i <= 2:
+                    eb[o].use_connect = True
+
+        bpy.ops.object.mode_set(mode ='OBJECT')
+        pb = self.obj.pose.bones
+        pb_parent = pb[ parent ]
+
+        # Create ik/fk switch property
+        pb_parent['IK/FK']  = 0.0
+        prop = rna_idprop_ui_prop_get( pb_parent, 'IK/FK', create=True )
+        prop["min"]         = 0.0
+        prop["max"]         = 1.0
+        prop["soft_min"]    = 0.0
+        prop["soft_max"]    = 1.0
+        prop["description"] = 'IK/FK Switch'
+
+        # Constrain org to IK and FK bones
+        iks = [ ik[k] for k in ['ctrl', 'mch_ik', 'mch_target'] ]
+        for o, i, f in zip( org, iks, fk ):
+            make_constraint( self, o, {
+                'constraint'  : 'COPY_TRANSFORMS',
+                'subtarget'   : i
+            })
+            make_constraint( self, o, {
+                'constraint'  : 'COPY_TRANSFORMS',
+                'subtarget'   : f
+            })
+    
+            # Add driver to relevant constraint
+            drv = pb[o].constraints[-1].driver_add("influence").driver
+            drv.type = 'SUM'
+            
+            var = drv.variables.new()
+            var.name = prop.name
+            var.type = "SINGLE_PROP"
+            var.targets[0].id = self.obj
+            var.targets[0].data_path = \
+                pb_parent.path_from_id() + '['+ '"' + prop.name + '"' + ']'
+
 
     def generate( self ):
         bpy.ops.object.mode_set(mode ='EDIT')
@@ -443,8 +488,12 @@ class Limb:
         bones['def']    = self.create_def( bones['tweak']['ctrl'] )
         bones['ik']     = self.create_ik(  bones['parent']        )
         bones['fk']     = self.create_fk(  bones['parent']        )
+
+        self.org_parenting_and_switch( 
+            self.org_bones, bones['ik'], bones['fk']['ctrl'], bones['parent'] 
+        )
         
-        return bones
+        return [ script ]
         
 def add_parameters( params ):
     """ Add the parameters of this rig type to the
@@ -459,7 +508,7 @@ def add_parameters( params ):
     params.rotation_axis = bpy.props.EnumProperty(
         items   = items, 
         name    = "Rotation Axis", 
-        default = 'lock_ik_x'
+        default = 'x'
     )
 
     params.segments = bpy.props.IntProperty(
