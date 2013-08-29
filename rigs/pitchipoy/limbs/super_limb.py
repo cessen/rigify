@@ -1,72 +1,18 @@
 import bpy, re
-from mathutils      import Vector
-from ...utils       import copy_bone, flip_bone, put_bone, org
-from ...utils       import strip_org, make_deformer_name, create_widget
-from ...utils       import create_circle_widget, create_sphere_widget
-from ...utils       import MetarigError, make_mechanism_name, create_cube_widget
-from ...utils       import create_limb_widget, connected_children_names
-from rna_prop_ui    import rna_idprop_ui_prop_get
-from .super_widgets import create_ikarrow_widget
-from math           import trunc
-
-bilateral_suffixes = ['.L','.R']
-
-def orient_bone( cls, eb, axis, scale = 1.0, reverse = False ):
-    v = Vector((0,0,0))
-   
-    setattr(v,axis,scale)
-
-    if reverse:
-        tail_vec = v * cls.obj.matrix_world
-        eb.head[:] = eb.tail
-        eb.tail[:] = eb.head + tail_vec     
-    else:
-        tail_vec = v * cls.obj.matrix_world
-        eb.tail[:] = eb.head + tail_vec
-
-
-def make_constraint( cls, bone, constraint ):
-    bpy.ops.object.mode_set(mode = 'OBJECT')
-    pb = cls.obj.pose.bones
-
-    owner_pb     = pb[bone]
-    const        = owner_pb.constraints.new( constraint['constraint'] )
-    const.target = cls.obj
-
-    # filter contraint props to those that actually exist in the currnet 
-    # type of constraint, then assign values to each
-    for p in [ k for k in constraint.keys() if k in dir(const) ]:
-        setattr( const, p, constraint[p] )
-
-def get_bone_name( name, btype, suffix = '' ):
-    # RE pattern match right or left parts
-    # match the letter "L" (or "R"), followed by an optional dot (".") 
-    # and 0 or more digits at the end of the the string
-    pattern = r'^(\S+)(\.\S+)$' 
-
-    name = strip_org( name )
-
-    types = {
-        'mch'  : make_mechanism_name( name ),
-        'org'  : org( name ),
-        'def'  : make_deformer_name( name ),
-        'ctrl' : name
-    }
-
-    name = types[btype]
-
-    if suffix:
-        results = re.match( pattern,  name )
-        bname, addition = ('','')
-        
-        if results:
-            bname, addition = results.groups()
-            name = bname + "_" + suffix + addition
-        else:
-            name = name  + "_" + suffix
-
-    return name
-
+from   .arm            import create_arm
+from   .leg            import create_leg
+from   .paw            import create_paw
+from   .ui             import create_script
+from   .limb_utils     import *
+from   mathutils       import Vector
+from   ....utils       import copy_bone, flip_bone, put_bone, create_cube_widget
+from   ....utils       import strip_org, make_deformer_name, create_widget
+from   ....utils       import create_circle_widget, create_sphere_widget
+from   ....utils       import MetarigError, make_mechanism_name, org
+from   ....utils       import create_limb_widget, connected_children_names
+from   rna_prop_ui     import rna_idprop_ui_prop_get
+from   ..super_widgets import create_ikarrow_widget
+from   math            import trunc
 
 class Rig:
     def __init__(self, obj, bone_name, params):
@@ -77,9 +23,10 @@ class Rig:
             [bone_name] + connected_children_names(obj, bone_name)
             )[:3]  # The basic limb is the first 3 bones
 
-        self.segments = params.segments
-        self.bbones   = params.bbones
-        self.rot_axis = params.rotation_axis
+        self.segments  = params.segments
+        self.bbones    = params.bbones
+        self.limb_type = params.limb_type
+        self.rot_axis  = params.rotation_axis
 
         # Assign values to tweak/FK layers props if opted by user
         if params.tweak_extra_layers:
@@ -170,7 +117,7 @@ class Rig:
                     eb[org_bones[i-1]].tail
                 )                        
  
-                ctrl = strip_org(org)
+                ctrl = get_bone_name( strip_org(org), 'ctrl', 'tweak' )
                 ctrl = copy_bone( self.obj, org, ctrl )
                 eb[ ctrl ].length = eb[org].length / 2 
 
@@ -192,12 +139,12 @@ class Rig:
             middle = trunc( len( tweaks['mch'] ) / 2 )
             last   = len( tweaks['mch'] ) - 1
 
-            if i == first or i == middle or i == last:
+            if i == first or i == middle:
                 make_constraint( self, b, {
                     'constraint'  : 'COPY_SCALE',
                     'subtarget'   : 'root'
                 })
-            else:
+            elif i != last:
                 targets       = []
                 dt_target_idx = middle
                 factor        = 0
@@ -390,12 +337,6 @@ class Rig:
             if axis != self.rot_axis:
                setattr( pb[ mch_ik ], 'lock_ik_' + axis, True )
 
-        make_constraint( self, mch_target, {
-            'constraint'  : 'COPY_LOCATION',
-            'subtarget'   : mch_str,
-            'head_tail'   : 1.0
-        })
-
         # Locks and Widget
         pb[ ctrl ].lock_rotation = True, False, True
         create_ikarrow_widget( self.obj, ctrl, bone_transform_name=None )
@@ -503,6 +444,15 @@ class Rig:
                 pb_parent.path_from_id() + '['+ '"' + prop.name + '"' + ']'
 
 
+    def create_terminal( self, limb_type, bones ):
+        if   limb_type == 'arm':
+            return create_arm( self, bones )
+        elif limb_type == 'leg':
+            return create_leg( self, bones )
+        elif limb_type == 'paw':
+            return create_paw( self, bones )
+
+
     def generate( self ):
         bpy.ops.object.mode_set(mode ='EDIT')
         eb = self.obj.data.edit_bones
@@ -524,13 +474,26 @@ class Rig:
         self.org_parenting_and_switch( 
             self.org_bones, bones['ik'], bones['fk']['ctrl'], bones['parent'] 
         )
+
+        bones = self.create_terminal( self.limb_type, bones )
         
-        return bones
+        return [ create_script( self, self.limb_type, bones ) ]
         
 def add_parameters( params ):
     """ Add the parameters of this rig type to the
         RigifyParameters PropertyGroup
     """
+
+    items = [
+        ('arm', 'Arm', ''), 
+        ('leg', 'Leg', ''), 
+        ('paw', 'Paw', '')
+    ]
+    params.limb_type = bpy.props.EnumProperty(
+        items   = items, 
+        name    = "Limb Type", 
+        default = 'arm'
+    )
 
     items = [
         ('x', 'X', ''), 
@@ -586,6 +549,9 @@ def add_parameters( params ):
 
 def parameters_ui(layout, params):
     """ Create the ui for the rig parameters."""
+
+    r = layout.row()
+    r.prop(params, "limb_type")
    
     r = layout.row()
     r.prop(params, "rotation_axis")
@@ -599,7 +565,7 @@ def parameters_ui(layout, params):
     for layer in [ 'tweak', 'fk' ]:
         r = layout.row()
         r.prop(params, layer + "_extra_layers")
-        r.active = params.tweak_extra_layersik_controls
+        r.active = params.tweak_extra_layers
         
         col = r.column(align=True)
         row = col.row(align=True)
