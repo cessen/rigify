@@ -31,13 +31,13 @@ def create_paw( cls, bones ):
     bpy.ops.object.mode_set(mode='EDIT')
     eb = cls.obj.data.edit_bones
 
-    # Create mch str target bone
-    mch_str_tar = get_bone_name( org_bones[2], 'mch', 'str_target' )
-    mch_str_tar = copy_bone( cls.obj, org_bones[2], mch_str_tar )
+    # Create heel control bone
+    heel = get_bone_name( org_bones[2], 'ctrl', 'heel_ik' )
+    heel = copy_bone( cls.obj, org_bones[2], heel )
 
     # clear parent
-    eb[ mch_str_tar ].parent      = None
-    eb[ mch_str_tar ].use_connect = False
+    eb[ heel ].parent      = None
+    eb[ heel ].use_connect = False
 
     # Create IK arm control
     ctrl = get_bone_name( org_bones[2], 'ctrl', 'ik' )
@@ -48,12 +48,12 @@ def create_paw( cls, bones ):
     eb[ ctrl ].use_connect = False
 
     # Parent 
-    eb[ mch_str_tar ].parent                    = eb[ ctrl ]
-    eb[ mch_str_tar ].use_connect               = False
+    eb[ heel ].parent      = eb[ ctrl ]
+    eb[ heel ].use_connect = False
 
-    flip_bone( cls.obj, mch_str_tar )
+    flip_bone( cls.obj, heel )
     
-    eb[ bones['ik']['mch_target'] ].parent      = eb[ mch_str_tar ]
+    eb[ bones['ik']['mch_target'] ].parent      = eb[ heel ]
     eb[ bones['ik']['mch_target'] ].use_connect = False
 
     # Reset control position and orientation
@@ -73,12 +73,12 @@ def create_paw( cls, bones ):
     # Constrain mch ik stretch bone to the ik control
     make_constraint( cls, bones['ik']['mch_str'], {
         'constraint'  : 'DAMPED_TRACK',
-        'subtarget'   : mch_str_tar,
+        'subtarget'   : heel,
         'head_tail'   : 1.0
     })
     make_constraint( cls, bones['ik']['mch_str'], {
         'constraint'  : 'STRETCH_TO',
-        'subtarget'   : mch_str_tar,
+        'subtarget'   : heel,
         'head_tail'   : 1.0
     })
     make_constraint( cls, bones['ik']['mch_str'], {
@@ -123,7 +123,47 @@ def create_paw( cls, bones ):
     # Create hand widget
     create_foot_widget(cls.obj, ctrl, bone_transform_name=None)
 
-    bones['ik']['mch_str_tar'] = mch_str_tar
-    bones['ik']['ctrl']        = ctrl
+    # Create toes if they exist in the meta rig
+    if len( org_bones ) >= 4:
+        # Create toes control bone
+        toes = get_bone_name( org_bones[3], 'ctrl', 'toes' )
+        toes = copy_bone( cls.obj, org_bones[3], toes )
+
+        eb[ toes ].use_connect = False
+        eb[ toes ].parent      = eb[ org_bones[3] ]
+        
+        # Create toes mch bone
+        toes_mch = get_bone_name( org_bones[3], 'mch', 'toes' )
+        toes_mch = copy_bone( cls.obj, org_bones[3], toes_mch )
+
+        eb[ toes_mch ].use_connect = False
+        eb[ toes_mch ].parent      = eb[ ctrl ]
+
+        eb[ toes_mch ].length /= 4
+        
+        # Constrain 4th ORG to toes MCH bone
+        make_constraint( cls, org_bones[3], {
+            'constraint'  : 'COPY_TRANSFORMS',
+            'subtarget'   : toes
+        })
+
+        # Find IK/FK switch property
+        pb   = self.obj.pose.bones
+        prop = rna_idprop_ui_prop_get( pb[ bones['parent'] ], 'IK/FK' )
+        
+        # Add driver to limit scale constraint influence
+        b        = bones[ org_bones[3] ]
+        drv      = pb[b].constraints[-1].driver_add("influence").driver
+        drv.type = 'SUM'
+        
+        var = drv.variables.new()
+        var.name = prop.name
+        var.type = "SINGLE_PROP"
+        var.targets[0].id = cls.obj
+        var.targets[0].data_path = \
+            pb_parent.path_from_id() + '['+ '"' + prop.name + '"' + ']'
+   
+    bones['ik']['ctrl']     = { 'paw' : ctrl, 'heel' : heel, 'toes' : toes }
+    bones['ik']['toes_mch'] = toes_mch
 
     return bones
