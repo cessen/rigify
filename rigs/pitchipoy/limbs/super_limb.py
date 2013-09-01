@@ -240,11 +240,14 @@ class Rig:
                 })
 
         # Create bbone segments
-        for bone in def_bones[:-1]:
+        for bone in def_bones:
             self.obj.data.bones[bone].bbone_segments = self.bbones
 
         self.obj.data.bones[ def_bones[0]  ].bbone_in  = 0.0
         self.obj.data.bones[ def_bones[-2] ].bbone_out = 0.0
+        self.obj.data.bones[ def_bones[-1] ].bbone_in  = 0.0
+        self.obj.data.bones[ def_bones[-1] ].bbone_out = 0.0
+
 
         # Rubber hose drivers
         pb = self.obj.pose.bones
@@ -280,7 +283,7 @@ class Rig:
             for d in drvs:
                 drv = drvs[d]
                 name = 'rubber_' + tweaks[d]
-                drv.type = 'SUM'
+                drv.type = 'AVERAGE'
                 var = drv.variables.new()
                 var.name = name
                 var.type = "SINGLE_PROP"
@@ -434,7 +437,7 @@ class Rig:
     
             # Add driver to relevant constraint
             drv = pb[o].constraints[-1].driver_add("influence").driver
-            drv.type = 'SUM'
+            drv.type = 'AVERAGE'
             
             var = drv.variables.new()
             var.name = prop.name
