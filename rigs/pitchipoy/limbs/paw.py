@@ -18,19 +18,33 @@
 
 # <pep8 compliant>
 import bpy
-from ....utils       import MetarigError
-from ....utils       import create_widget, copy_bone
+from ....utils       import MetarigError, connected_children_names
+from ....utils       import create_widget, copy_bone, create_circle_widget
 from ....utils       import strip_org, flip_bone
-from .limb_utils     import *
-from ..super_widgets import create_foot_widget
 from rna_prop_ui     import rna_idprop_ui_prop_get
+from ..super_widgets import create_foot_widget, create_ballsocket_widget
+from .limb_utils     import *
 
 def create_paw( cls, bones ):
-    org_bones = cls.org_bones
+    org_bones = list(
+        [cls.org_bones[0]] + connected_children_names(cls.obj, cls.org_bones[0])
+    )
+
+    bones['ik']['ctrl'] = {}
     
     bpy.ops.object.mode_set(mode='EDIT')
     eb = cls.obj.data.edit_bones
 
+    # Create toes def bone
+    toes_def = get_bone_name( org_bones[-1], 'def' )
+    toes_def = copy_bone( cls.obj, org_bones[-1], toes_def )
+
+    eb[ toes_def ].use_connect = False
+    eb[ toes_def ].parent      = eb[ bones['def'][-1] ]
+    eb[ toes_def ].use_connect = True
+
+    bones['def'] += [ toes_def ]
+    
     # Create heel control bone
     heel = get_bone_name( org_bones[2], 'ctrl', 'heel_ik' )
     heel = copy_bone( cls.obj, org_bones[2], heel )
@@ -39,7 +53,7 @@ def create_paw( cls, bones ):
     eb[ heel ].parent      = None
     eb[ heel ].use_connect = False
 
-    # Create IK arm control
+    # Create IK paw control
     ctrl = get_bone_name( org_bones[2], 'ctrl', 'ik' )
     ctrl = copy_bone( cls.obj, org_bones[2], ctrl )
 
@@ -104,7 +118,7 @@ def create_paw( cls, bones ):
     # Add driver to limit scale constraint influence
     b        = bones['ik']['mch_str']
     drv      = pb[b].constraints[-1].driver_add("influence").driver
-    drv.type = 'SUM'
+    drv.type = 'AVERAGE'
     
     var = drv.variables.new()
     var.name = prop.name
@@ -120,20 +134,28 @@ def create_paw( cls, bones ):
     drv_modifier.coefficients[0] = 1.0
     drv_modifier.coefficients[1] = -1.0
 
-    # Create hand widget
+    # Create paw widget
     create_foot_widget(cls.obj, ctrl, bone_transform_name=None)
 
-    # Create toes if they exist in the meta rig
+    # Create heel ctrl locks
+    pb[ heel ].lock_location = True, True, True
+
+    # Add ballsocket widget to heel
+    create_ballsocket_widget(cls.obj, heel, bone_transform_name=None)
+
+    bpy.ops.object.mode_set(mode='EDIT')
+    eb = cls.obj.data.edit_bones
+
     if len( org_bones ) >= 4:
         # Create toes control bone
-        toes = get_bone_name( org_bones[3], 'ctrl', 'toes' )
+        toes = get_bone_name( org_bones[3], 'ctrl' )
         toes = copy_bone( cls.obj, org_bones[3], toes )
 
         eb[ toes ].use_connect = False
         eb[ toes ].parent      = eb[ org_bones[3] ]
         
         # Create toes mch bone
-        toes_mch = get_bone_name( org_bones[3], 'mch', 'toes' )
+        toes_mch = get_bone_name( org_bones[3], 'mch' )
         toes_mch = copy_bone( cls.obj, org_bones[3], toes_mch )
 
         eb[ toes_mch ].use_connect = False
@@ -144,17 +166,32 @@ def create_paw( cls, bones ):
         # Constrain 4th ORG to toes MCH bone
         make_constraint( cls, org_bones[3], {
             'constraint'  : 'COPY_TRANSFORMS',
+            'subtarget'   : toes_mch
+        })
+
+        # Constrain toes def bones
+        make_constraint( cls, bones['def'][-2], {
+            'constraint'  : 'DAMPED_TRACK',
+            'subtarget'   : toes
+        })
+        make_constraint( cls, bones['def'][-2], {
+            'constraint'  : 'STRETCH_TO',
+            'subtarget'   : toes
+        })        
+       
+        make_constraint( cls, bones['def'][-1], {
+            'constraint'  : 'COPY_TRANSFORMS',
             'subtarget'   : toes
         })
 
         # Find IK/FK switch property
-        pb   = self.obj.pose.bones
+        pb   = cls.obj.pose.bones
         prop = rna_idprop_ui_prop_get( pb[ bones['parent'] ], 'IK/FK' )
         
         # Add driver to limit scale constraint influence
-        b        = bones[ org_bones[3] ]
+        b        = org_bones[3]
         drv      = pb[b].constraints[-1].driver_add("influence").driver
-        drv.type = 'SUM'
+        drv.type = 'AVERAGE'
         
         var = drv.variables.new()
         var.name = prop.name
@@ -162,8 +199,21 @@ def create_paw( cls, bones ):
         var.targets[0].id = cls.obj
         var.targets[0].data_path = \
             pb_parent.path_from_id() + '['+ '"' + prop.name + '"' + ']'
+
+        drv_modifier = cls.obj.animation_data.drivers[-1].modifiers[0]
+        
+        drv_modifier.mode            = 'POLYNOMIAL'
+        drv_modifier.poly_order      = 1
+        drv_modifier.coefficients[0] = 1.0
+        drv_modifier.coefficients[1] = -1.0
    
-    bones['ik']['ctrl']     = { 'paw' : ctrl, 'heel' : heel, 'toes' : toes }
-    bones['ik']['toes_mch'] = toes_mch
+        bones['ik']['toes_mch']     = toes_mch
+        bones['ik']['ctrl']['toes'] = toes
+
+        # Create toe circle widget
+        create_circle_widget(cls.obj, toes, radius=0.4, head_tail=0.5)
+
+    bones['ik']['ctrl']['paw']  = ctrl
+    bones['ik']['ctrl']['heel'] = heel
 
     return bones
