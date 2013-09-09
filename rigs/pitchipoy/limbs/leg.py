@@ -20,7 +20,7 @@
 import bpy, math
 from ....utils       import MetarigError, connected_children_names
 from ....utils       import create_widget, copy_bone, create_circle_widget
-from ....utils       import strip_org, flip_bone
+from ....utils       import strip_org, flip_bone, put_bone
 from rna_prop_ui     import rna_idprop_ui_prop_get
 from ..super_widgets import create_foot_widget, create_ballsocket_widget
 from .limb_utils     import *
@@ -30,7 +30,7 @@ def create_leg( cls, bones ):
         [cls.org_bones[0]] + connected_children_names(cls.obj, cls.org_bones[0])
     )
 
-    bones['ik']['ctrl'] = {}
+    bones['ik']['ctrl']['terminal'] = []
     
     bpy.ops.object.mode_set(mode='EDIT')
     eb = cls.obj.data.edit_bones
@@ -53,33 +53,29 @@ def create_leg( cls, bones ):
     eb[ ctrl ].parent      = None
     eb[ ctrl ].use_connect = False
 
-    # Parent 
-    eb[ heel ].parent      = eb[ ctrl ]
-    eb[ heel ].use_connect = False
-
-    eb[ bones['ik']['mch_target'] ].parent      = eb[ heel ]
-    eb[ bones['ik']['mch_target'] ].use_connect = False
+    # Create heel ctrl bone
+    heel = get_bone_name( org_bones[2], 'ctrl', 'heel_ik' )
+    heel = copy_bone( cls.obj, org_bones[2], heel )
+    orient_bone( cls, eb[ heel ], 'y', 0.5 )
+    eb[ heel ].length = eb[ org_bones[2] ].length / 2
 
     # Reset control position and orientation
     l = eb[ ctrl ].length
     orient_bone( cls, eb[ ctrl ], 'y', reverse = True )
     eb[ ctrl ].length = l
 
-    # Create heel ctrl bone
-    heel = get_bone_name( org_bones[2], 'ctrl', 'heel_ik' )
-    heel = copy_bone( cls.obj, org_bones[2], heel )
-
-    # clear parent
-    eb[ heel ].parent      = None
+    # Parent 
     eb[ heel ].use_connect = False
+    eb[ heel ].parent      = eb[ ctrl ]
 
-    orient_bone( cls, eb[ heel ], 'y', 0.5 )
+    eb[ bones['ik']['mch_target'] ].parent      = eb[ heel ]
+    eb[ bones['ik']['mch_target'] ].use_connect = False
 
     # Create foot mch rock and roll bones
 
     # Get the tmp heel (floating unconnected without children)
     tmp_heel = ""
-    for b in self.obj.data.bones[ org_bones[2] ].children:
+    for b in cls.obj.data.bones[ org_bones[2] ].children:
         if not b.use_connect and not b.children:
             tmp_heel = b.name
 
@@ -95,14 +91,18 @@ def create_leg( cls, bones ):
 
     # Create 2nd roll mch, and two rock mch bones
     roll2_mch = get_bone_name( tmp_heel, 'mch', 'roll' )
-    roll2_mch = copy_bone( cls.obj, tmp_heel, roll2_mch )    
+    roll2_mch = copy_bone( cls.obj, org_bones[3], roll2_mch )    
 
     eb[ roll2_mch ].use_connect = False
     eb[ roll2_mch ].parent      = None
     
-    eb[ roll2_mch ].head = ( eb[ tmp_heel ].head + eb[ tmp_heel ].tail ) / 2
-    orient_bone( cls, eb[ heel ], 'y', -1.0 )
-    eb[ roll2_mch ].length = eb[ tmp_heel ].length / 2
+    put_bone( 
+        cls.obj, 
+        roll2_mch, 
+        ( eb[ tmp_heel ].head + eb[ tmp_heel ].tail ) / 2
+    )
+
+    eb[ roll2_mch ].length /= 4
     
     # Rock MCH bones
     rock1_mch = get_bone_name( tmp_heel, 'mch', 'rock' )
@@ -111,8 +111,8 @@ def create_leg( cls, bones ):
     eb[ rock1_mch ].use_connect = False
     eb[ rock1_mch ].parent      = None    
     
-    orient_bone( cls, eb[ heel ], 'y', 1.0, reverse = True )
-    eb[ roll2_mch ].length = eb[ tmp_heel ].length / 2
+    orient_bone( cls, eb[ rock1_mch ], 'y', 1.0, reverse = True )
+    eb[ rock1_mch ].length = eb[ tmp_heel ].length / 2
     
     rock2_mch = get_bone_name( tmp_heel, 'mch', 'rock' )
     rock2_mch = copy_bone( cls.obj, tmp_heel, rock2_mch )
@@ -120,8 +120,8 @@ def create_leg( cls, bones ):
     eb[ rock2_mch ].use_connect = False
     eb[ rock2_mch ].parent      = None    
 
-    orient_bone( cls, eb[ heel ], 'y', 1.0 )
-    eb[ roll2_mch ].length = eb[ tmp_heel ].length / 2
+    orient_bone( cls, eb[ rock2_mch ], 'y', 1.0 )
+    eb[ rock2_mch ].length = eb[ tmp_heel ].length / 2
     
     # Parent rock and roll MCH bones
     eb[ roll1_mch ].parent = eb[ roll2_mch ]
@@ -147,6 +147,7 @@ def create_leg( cls, bones ):
         'subtarget'    : heel,
         'use_y'        : False,
         'use_z'        : False,
+        'invert_x'     : True,
         'owner_space'  : 'LOCAL',
         'target_space' : 'LOCAL'
     })    
@@ -188,7 +189,7 @@ def create_leg( cls, bones ):
     })    
 
     
-    # Constrain 4th ORG to toes MCH bone
+    # Constrain 4th ORG to roll2 MCH bone
     make_constraint( cls, org_bones[3], {
         'constraint'  : 'COPY_TRANSFORMS',
         'subtarget'   : roll2_mch
@@ -258,6 +259,8 @@ def create_leg( cls, bones ):
 
     # Create heel ctrl locks
     pb[ heel ].lock_location = True, True, True
+    pb[ heel ].lock_rotation = False, False, True
+    pb[ heel ].lock_scale    = True, True, True
 
     # Add ballsocket widget to heel
     create_ballsocket_widget(cls.obj, heel, bone_transform_name=None)
@@ -311,13 +314,11 @@ def create_leg( cls, bones ):
         drv_modifier.coefficients[0] = 1.0
         drv_modifier.coefficients[1] = -1.0
    
-        bones['ik']['toes_mch']     = toes_mch
-        bones['ik']['ctrl']['toes'] = toes
-
         # Create toe circle widget
         create_circle_widget(cls.obj, toes, radius=0.4, head_tail=0.5)
 
-    bones['ik']['ctrl']['foot']  = ctrl
-    bones['ik']['ctrl']['heel'] = heel
+        bones['ik']['ctrl']['terminal'] += [ toes ]
 
+    bones['ik']['ctrl']['terminal'] += [ heel, ctrl ]
+    
     return bones

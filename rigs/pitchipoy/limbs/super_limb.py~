@@ -14,6 +14,15 @@ from   rna_prop_ui     import rna_idprop_ui_prop_get
 from   ..super_widgets import create_ikarrow_widget
 from   math            import trunc
 
+script = """
+controls = [%s]
+torso    = '%s'
+
+if is_selected( controls ):
+    layout.prop( pose_bones[ torso ], '["%s"]', slider = True )
+    layout.prop( pose_bones[ torso ], '["%s"]', slider = True )
+"""
+
 class Rig:
     def __init__(self, obj, bone_name, params):
         """ Initialize torso rig and key rig properties """
@@ -51,7 +60,7 @@ class Rig:
         orient_bone( self, eb[mch], 'y' )
         eb[ mch ].length = eb[ org_bones[0] ].length / 4
 
-        eb[ mch ].parent = None # Goes to root later
+        eb[ mch ].parent = eb[ org_bones[0] ].parent
         
         eb[ mch ].roll = 0.0
         
@@ -245,21 +254,22 @@ class Rig:
 
         self.obj.data.bones[ def_bones[0]  ].bbone_in  = 0.0
         self.obj.data.bones[ def_bones[-2] ].bbone_out = 0.0
+        self.obj.data.bones[ def_bones[-1] ].bbone_in  = 0.0
+        self.obj.data.bones[ def_bones[-1] ].bbone_out = 0.0
+
 
         # Rubber hose drivers
         pb = self.obj.pose.bones
         for i,t in enumerate( tweaks[1:-1] ):
             # Create custom property on tweak bone to control rubber hose
-            name = 'rubber_' + t 
+            name = 'rubber_tweak'
 
             if i == trunc( len( tweaks[1:-1] ) / 2 ):
                 pb[t][name] = 0.0
             else:
                 pb[t][name] = 1.0
 
-            prop                = rna_idprop_ui_prop_get( 
-                                    pb[t], name, create=True
-                                  )
+            prop = rna_idprop_ui_prop_get( pb[t], name, create=True )
                                   
             prop["min"]         = 0.0
             prop["max"]         = 2.0
@@ -341,7 +351,7 @@ class Rig:
         pb[ ctrl ].lock_rotation = True, False, True
         create_ikarrow_widget( self.obj, ctrl, bone_transform_name=None )
         
-        return { 'ctrl'       : ctrl, 
+        return { 'ctrl'       : { 'limb' : ctrl }, 
                  'mch_ik'     : mch_ik, 
                  'mch_target' : mch_target,
                  'mch_str'    : mch_str
@@ -421,7 +431,9 @@ class Rig:
         prop["description"] = 'IK/FK Switch'
 
         # Constrain org to IK and FK bones
-        iks = [ ik[k] for k in ['ctrl', 'mch_ik', 'mch_target'] ]
+        iks =  [ ik['ctrl']['limb'] ]
+        iks += [ ik[k] for k in [ 'mch_ik', 'mch_target'] ]
+
         for o, i, f in zip( org, iks, fk ):
             make_constraint( self, o, {
                 'constraint'  : 'COPY_TRANSFORMS',
@@ -458,7 +470,7 @@ class Rig:
         eb = self.obj.data.edit_bones
 
         # Clear parents for org bones
-        for bone in self.org_bones:
+        for bone in self.org_bones[1:]:
             eb[bone].use_connect = False
             eb[bone].parent      = None
             
@@ -477,7 +489,7 @@ class Rig:
 
         bones = self.create_terminal( self.limb_type, bones )
         
-        return [ create_script( self, self.limb_type, bones ) ]
+        return [ create_script( bones ) ]
         
 def add_parameters( params ):
     """ Add the parameters of this rig type to the
@@ -562,7 +574,7 @@ def parameters_ui(layout, params):
     r = layout.row()
     r.prop(params, "bbones")
 
-    for layer in [ 'tweak', 'fk' ]:
+    for layer in [ 'fk', 'tweak' ]:
         r = layout.row()
         r.prop(params, layer + "_extra_layers")
         r.active = params.tweak_extra_layers

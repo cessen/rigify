@@ -30,7 +30,7 @@ def create_paw( cls, bones ):
         [cls.org_bones[0]] + connected_children_names(cls.obj, cls.org_bones[0])
     )
 
-    bones['ik']['ctrl'] = {}
+    bones['ik']['ctrl'] = []
     
     bpy.ops.object.mode_set(mode='EDIT')
     eb = cls.obj.data.edit_bones
@@ -207,13 +207,11 @@ def create_paw( cls, bones ):
         drv_modifier.coefficients[0] = 1.0
         drv_modifier.coefficients[1] = -1.0
    
-        bones['ik']['toes_mch']     = toes_mch
-        bones['ik']['ctrl']['toes'] = toes
-
         # Create toe circle widget
         create_circle_widget(cls.obj, toes, radius=0.4, head_tail=0.5)
 
-    bones['ik']['ctrl']['paw']  = ctrl
-    bones['ik']['ctrl']['heel'] = heel
+        bones['ik']['ctrl']['terminal'] += [ toes ]
+
+    bones['ik']['ctrl']['terminal'] += [ heel, ctrl ]
 
     return bones

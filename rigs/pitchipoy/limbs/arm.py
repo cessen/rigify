@@ -104,6 +104,6 @@ def create_arm( cls, bones ):
     # Create hand widget
     create_hand_widget(cls.obj, ctrl, bone_transform_name=None)
 
-    bones['ik']['ctrl'] = ctrl
+    bones['ik']['ctrl']['terminal'] = [ ctrl ]
 
     return bones
