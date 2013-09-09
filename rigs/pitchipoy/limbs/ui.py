@@ -26,7 +26,7 @@ def create_script( bones):
     controls_string = ", ".join(["'" + x + "'" for x in controls])
 
     # All tweaks have their own bbone prop
-    tweaks        = bones['tweak']['ctrl']
+    tweaks        = bones['tweak']['ctrl'][1:-1]
     tweaks_string = ", ".join(["'" + x + "'" for x in tweaks])
     
     # IK ctrl has IK stretch 

@@ -157,38 +157,42 @@ def create_leg( cls, bones ):
         'max_x'       : math.radians(360),
         'owner_space' : 'LOCAL'
     })    
-   
-    make_constraint( cls, rock1_mch, {
-        'constraint'   : 'COPY_ROTATION',
-        'subtarget'    : heel,
-        'use_x'        : False,
-        'use_z'        : False,
-        'owner_space'  : 'LOCAL',
-        'target_space' : 'LOCAL'
-    })    
-    make_constraint( cls, rock1_mch, {
-        'constraint'  : 'LIMIT_ROTATION',
-        'use_limit_y' : True,
-        'max_y'       : math.radians(360),
-        'owner_space' : 'LOCAL'
-    })    
 
-    make_constraint( cls, rock2_mch, {
-        'constraint'   : 'COPY_ROTATION',
-        'subtarget'    : heel,
-        'use_x'        : False,
-        'use_z'        : False,
-        'owner_space'  : 'LOCAL',
-        'target_space' : 'LOCAL'
-    })    
-    make_constraint( cls, rock2_mch, {
-        'constraint'  : 'LIMIT_ROTATION',
-        'use_limit_y' : True,
-        'min_y'       : math.radians(-360),
-        'owner_space' : 'LOCAL'
-    })    
+    pb = cls.obj.pose.bones   
+    for i,b in enumerate([ rock1_mch, rock2_mch ]):
+        head_tail = pb[b].head - pb[tmp_heel].head
+        if '.L' in b:
+            if not i:
+                min_y = 0
+                max_y = math.radians(360)
+            else:
+                min_y = math.radians(-360)
+                max_y = 0
+        else:
+            if not i:
+                min_y = math.radians(-360)
+                max_y = 0
+            else:
+                min_y = 0
+                max_y = math.radians(360)
 
-    
+                
+        make_constraint( cls, b, {
+            'constraint'   : 'COPY_ROTATION',
+            'subtarget'    : heel,
+            'use_x'        : False,
+            'use_z'        : False,
+            'owner_space'  : 'LOCAL',
+            'target_space' : 'LOCAL'
+        })    
+        make_constraint( cls, b, {
+            'constraint'  : 'LIMIT_ROTATION',
+            'use_limit_y' : True,
+            'min_y'       : min_y,
+            'max_y'       : max_y,
+            'owner_space' : 'LOCAL'
+        })    
+
     # Constrain 4th ORG to roll2 MCH bone
     make_constraint( cls, org_bones[3], {
         'constraint'  : 'COPY_TRANSFORMS',
@@ -224,7 +228,6 @@ def create_leg( cls, bones ):
     })
 
     # Create ik/fk switch property
-    pb = cls.obj.pose.bones
     pb_parent = pb[ bones['parent'] ]
     
     pb_parent['IK_Strertch'] = 1.0
