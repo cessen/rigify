@@ -136,7 +136,7 @@ class Rig:
         eyes_ctrl_e.head[:] =  ( eyeL_ctrl_e.head + eyeR_ctrl_e.head ) / 2
         
         for bone in [ eyeL_ctrl_e, eyeR_ctrl_e, eyes_ctrl_e ]:
-            bone.tail[:] = bone.head + Vector( [ 0, 0, eyeL_e.length ] )
+            bone.tail[:] = bone.head + Vector( [ 0, 0, eyeL_e.length / 2 ] )
         
         ## turbo: adding a master eye.X for transforming the whole eye
         eye_master_names = []
@@ -255,7 +255,7 @@ class Rig:
             tweaks.append( tweak_name )
 
             eb[ tweak_name ].tail[:] = \
-                eb[ tweak_name ].head + Vector(( 0, 0, self.face_length / 6 ))
+                eb[ tweak_name ].head + Vector(( 0, 0, self.face_length / 7 ))
 
             # create tail bone
             if bone in tails:
@@ -271,7 +271,7 @@ class Rig:
 
                 eb[ tweak_name ].head    = eb[ bone ].tail
                 eb[ tweak_name ].tail[:] = \
-                    eb[ tweak_name ].head + Vector(( 0, 0, self.face_length / 6 ))
+                    eb[ tweak_name ].head + Vector(( 0, 0, self.face_length / 7 ))
                 
                 tweaks.append( tweak_name )
             
