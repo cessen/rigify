@@ -122,16 +122,16 @@ class Rig:
         
         self.orient_bone( ctrl_eb, 'y', self.spine_length / 2.5 )
         
-        pivot_pos = ( eb[ org_bones[0]].head + eb[ org_bones[0]].tail ) / 2
-        
-        put_bone( self.obj, ctrl_name, pivot_pos )
-        
         # Create mch_pivot
         mch_name = make_mechanism_name( 'pivot' )
         mch_name = copy_bone(self.obj, ctrl_name, mch_name)
         mch_eb   = eb[ mch_name ]
         
         mch_eb.length /= 4
+
+        # Positioning pivot in a more usable location for animators
+        pivot_loc = ( eb[ org_bones[0]].head + eb[ org_bones[0]].tail ) / 2
+        put_bone( self.obj, ctrl_name, pivot_loc )
 
         return {
             'ctrl' : ctrl_name,
