@@ -109,7 +109,8 @@ class Rig:
 
     def create_pivot( self, pivot ):
         """ Create the pivot control and mechanism bones """
-        pivot_name = self.org_bones[pivot-1]
+        org_bones  = self.org_bones
+        pivot_name = org_bones[pivot-1]
 
         bpy.ops.object.mode_set(mode ='EDIT')
         eb = self.obj.data.edit_bones
@@ -120,6 +121,10 @@ class Rig:
         ctrl_eb    = eb[ ctrl_name ]
         
         self.orient_bone( ctrl_eb, 'y', self.spine_length / 2.5 )
+        
+        pivot_pos = ( eb[ org_bones[0]].head + eb[ org_bones[0]].tail ) / 2
+        
+        put_bone( self.obj, ctrl_name, pivot_pos )
         
         # Create mch_pivot
         mch_name = make_mechanism_name( 'pivot' )
