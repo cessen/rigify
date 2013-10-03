@@ -550,10 +550,10 @@ class Rig:
         left, right = self.symmetrical_split( everyone )
         
         for l in left:
-            eb[ l ].parent = eb[ 'eye.L_master' ]
+            eb[ l ].parent = eb[ 'master_eye.L' ]
 
         for r in right:
-            eb[ r ].parent = eb[ 'eye.R_master' ]
+            eb[ r ].parent = eb[ 'master_eye.R' ]
 
         ## turbo: nose to mch jaw.004
         eb[ all_bones['ctrls']['nose'].pop() ].parent = eb['MCH-jaw_master.004'] 
