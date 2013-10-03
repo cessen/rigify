@@ -138,13 +138,13 @@ class Rig:
         for bone in [ eyeL_ctrl_e, eyeR_ctrl_e, eyes_ctrl_e ]:
             bone.tail[:] = bone.head + Vector( [ 0, 0, eyeL_e.length * 0.75 ] )
         
-        ## turbo: adding a master eye.X for transforming the whole eye
+        ## Widget for transforming the both eyes
         eye_master_names = []
         for bone in bones['eyes']:
             eye_master = copy_bone( 
                 self.obj, 
                 bone,  
-                strip_org(bone) + '_master' 
+                'master_' + strip_org(bone)
             )
 
             eye_master_names.append( eye_master )
@@ -828,6 +828,7 @@ class Rig:
             'brow.B.L.001'  : [ [ 'brow.B.L.002'                   ], [ 0.6       ] ],
             'brow.B.L.003'  : [ [ 'brow.B.L.002'                   ], [ 0.6       ] ],
             'brow.B.L.002'  : [ [ 'lid.T.L.001',                   ], [ 0.25      ] ],
+            'brow.B.L.002'  : [ [ 'brow.T.L.002',                  ], [ 0.25      ] ],
             'lid.T.L.001'   : [ [ 'lid.T.L.002'                    ], [ 0.6       ] ],
             'lid.T.L.003'   : [ [ 'lid.T.L.002',                   ], [ 0.6       ] ],
             'lid.T.L.002'   : [ [ 'MCH-eye.L.001',                 ], [ 0.5       ] ],

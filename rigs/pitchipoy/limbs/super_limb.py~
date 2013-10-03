@@ -249,7 +249,7 @@ class Rig:
                 })
 
         # Create bbone segments
-        for bone in def_bones:
+        for bone in def_bones[:-1]:
             self.obj.data.bones[bone].bbone_segments = self.bbones
 
         self.obj.data.bones[ def_bones[0]  ].bbone_in  = 0.0
@@ -289,7 +289,7 @@ class Rig:
 
             for d in drvs:
                 drv = drvs[d]
-                name = 'rubber_' + tweaks[d]
+                name = 'rubber_tweak'
                 drv.type = 'AVERAGE'
                 var = drv.variables.new()
                 var.name = name
