@@ -20,9 +20,12 @@ class Rig:
     def __init__(self, obj, bone_name, params):
         """ Initialize torso rig and key rig properties """
 
-        self.obj       = obj
-        self.org_bones = [bone_name] + connected_children_names(obj, bone_name)
-        self.params    = params
+        eb = obj.data.edit_bones
+
+        self.obj          = obj
+        self.org_bones    = [bone_name] + connected_children_names(obj, bone_name)
+        self.params       = params
+        self.spine_length = sum( [ eb[b].length for b in self.org_bones ] )
 
         # Check if user provided the positions of the neck and pivot
         if params.neck_pos and params.pivot_pos:
@@ -214,10 +217,12 @@ class Rig:
         
         bpy.ops.object.mode_set(mode ='EDIT')
         eb = self.obj.data.edit_bones
+
+        # get total spine length
         
         # Create chest control bone
         chest = copy_bone( self.obj, org( chest_bones[0] ), 'chest' )
-        self.orient_bone( eb[chest], 'y', 0.4 )
+        self.orient_bone( eb[chest], 'y', self.spine_length / 3 )
 
         # create chest mch_wgt
         mch_wgt = copy_bone( 
@@ -230,7 +235,7 @@ class Rig:
         
         for b in chest_bones:
             mch_name = copy_bone( self.obj, org(b), make_mechanism_name(b) )
-            self.orient_bone( eb[mch_name], 'y', 0.1 )
+            self.orient_bone( eb[mch_name], 'y', self.spine_length / 10 )
 
             twk_name = "tweak_" + b
             twk_name = copy_bone( self.obj, org(b), twk_name )
@@ -255,7 +260,12 @@ class Rig:
         
         # Create hips control bone
         hips = copy_bone( self.obj, org( hip_bones[-1] ), 'hips' )
-        self.orient_bone( eb[hips], 'y', 0.4, reverse = True )
+        self.orient_bone( 
+            eb[hips], 
+            'y', 
+            self.spine_length / 4, 
+            reverse = True 
+        )
 
         # create hips mch_wgt
         mch_wgt = copy_bone( 
@@ -267,7 +277,9 @@ class Rig:
         twk,mch = [],[]
         for b in hip_bones:
             mch_name = copy_bone( self.obj, org(b), make_mechanism_name(b) )
-            self.orient_bone( eb[mch_name], 'y', 0.1, reverse = True )
+            self.orient_bone( 
+                eb[mch_name], 'y', self.spine_length / 10, reverse = True 
+            )
 
             twk_name = "tweak_" + b
             twk_name = copy_bone( self.obj, org( b ), twk_name )
