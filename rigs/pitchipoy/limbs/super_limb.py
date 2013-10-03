@@ -14,15 +14,6 @@ from   rna_prop_ui     import rna_idprop_ui_prop_get
 from   ..super_widgets import create_ikarrow_widget
 from   math            import trunc
 
-script = """
-controls = [%s]
-torso    = '%s'
-
-if is_selected( controls ):
-    layout.prop( pose_bones[ torso ], '["%s"]', slider = True )
-    layout.prop( pose_bones[ torso ], '["%s"]', slider = True )
-"""
-
 class Rig:
     def __init__(self, obj, bone_name, params):
         """ Initialize torso rig and key rig properties """
@@ -74,6 +65,30 @@ class Rig:
             'constraint'  : 'COPY_SCALE',
             'subtarget'   : 'root'
         })
+        
+        # Limb Follow Driver
+        pb = self.obj.pose.bones
+
+        name = 'FK_limb_follow'
+
+        pb[ mch ][ name ] = 0.0
+        prop = rna_idprop_ui_prop_get( pb[ mch ], name, create = True )
+                              
+        prop["min"]         = 0.0
+        prop["max"]         = 1.0
+        prop["soft_min"]    = 0.0
+        prop["soft_max"]    = 1.0
+        prop["description"] = name
+
+        drv = pb[ mch ].constraints[ 0 ].driver_add("influence").driver
+
+        drv.type = 'AVERAGE'
+        var = drv.variables.new()
+        var.name = name
+        var.type = "SINGLE_PROP"
+        var.targets[0].id = self.obj
+        var.targets[0].data_path = pb[ mch ].path_from_id() + \
+                                   '[' + '"' + name + '"' + ']'
 
         return mch
 
