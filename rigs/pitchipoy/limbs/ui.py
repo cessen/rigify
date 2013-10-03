@@ -2,6 +2,7 @@ script = """
 controls = [%s]
 tweaks   = [%s]
 ik_ctrl  = '%s'
+fk_ctrl  = '%s'
 parent   = '%s'
 
 # IK/FK Switch on all Control Bones
@@ -15,6 +16,10 @@ for t in tweaks:
         
 # IK Stretch on IK Control bone
 if is_selected( ik_ctrl ):
+    layout.prop( pose_bones[ parent ], '["%s"]', slider = True )
+    
+# FK limb follow
+if is_selected( fk_ctrl ):
     layout.prop( pose_bones[ parent ], '["%s"]', slider = True )
 """ 
 
@@ -36,8 +41,10 @@ def create_script( bones):
         controls_string, 
         tweaks_string, 
         ik_ctrl,
+        bones['fk']['ctrl'][0],
         bones['parent'],
         'IK/FK',
         'rubber_tweak',
-        'IK_Strertch'
+        'IK_Strertch',
+        'FK_limb_follow'
     )
