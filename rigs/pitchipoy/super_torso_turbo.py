@@ -119,7 +119,7 @@ class Rig:
         ctrl_name  = copy_bone(self.obj, pivot_name, torso_name)
         ctrl_eb    = eb[ ctrl_name ]
         
-        self.orient_bone( ctrl_eb, 'y', 0.5 )
+        self.orient_bone( ctrl_eb, 'y', self.spine_length / 2.5 )
         
         # Create mch_pivot
         mch_name = make_mechanism_name( 'pivot' )
@@ -174,14 +174,14 @@ class Rig:
             self.obj, neck, make_mechanism_name('ROT-neck')
         )
 
-        self.orient_bone( eb[mch_neck], 'y', 0.1 )
+        self.orient_bone( eb[mch_neck], 'y', self.spine_length / 10 )
 
         # Head MCH rotation
         mch_head = copy_bone( 
             self.obj, head, make_mechanism_name('ROT-head')
         )
 
-        self.orient_bone( eb[mch_head], 'y', 0.1 )
+        self.orient_bone( eb[mch_head], 'y', self.spine_length / 10 )
 
         twk,mch = [],[]
 
@@ -592,7 +592,7 @@ class Rig:
         create_circle_widget(
             self.obj, 
             bones['neck']['ctrl'], 
-            radius              = 1.25, 
+            radius              = 0.75, 
             head_tail           = 1.0, 
             with_line           = False, 
             bone_transform_name = None
