@@ -136,7 +136,7 @@ class Rig:
         eyes_ctrl_e.head[:] =  ( eyeL_ctrl_e.head + eyeR_ctrl_e.head ) / 2
         
         for bone in [ eyeL_ctrl_e, eyeR_ctrl_e, eyes_ctrl_e ]:
-            bone.tail[:] = bone.head + Vector( [ 0, 0, eyeL_e.length / 2 ] )
+            bone.tail[:] = bone.head + Vector( [ 0, 0, eyeL_e.length * 0.75 ] )
         
         ## turbo: adding a master eye.X for transforming the whole eye
         eye_master_names = []
@@ -201,7 +201,7 @@ class Rig:
             create_square_widget(self.obj, master)
 
         # Assign nose_master widget
-        create_square_widget(self.obj, master_nose, size = 0.5)
+        create_square_widget( self.obj, master_nose, size = 1 )
         
         # Assign ears widget
         create_ear_widget( self.obj, earL_ctrl_name )
