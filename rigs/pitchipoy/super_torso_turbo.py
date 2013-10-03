@@ -523,7 +523,7 @@ class Rig:
         for bone, prop, in zip( owners, props ):
             # Add driver to copy rotation constraint
             drv = pb[ bone ].constraints[ 0 ].driver_add("influence").driver
-            drv.type = 'SUM'
+            drv.type = 'AVERAGE'
             
             var = drv.variables.new()
             var.name = prop
