@@ -41,9 +41,9 @@ class Rig:
         for child in children:
             grand_children += connected_children_names( self.obj, child )
             
-        self.org_bones = [bone_name] + children + grand_children
-        
-        self.params    = params
+        self.org_bones   = [bone_name] + children + grand_children
+        self.face_length = obj.data.edit_bones[ self.org_bones[0] ].length
+        self.params      = params
 
         if params.primary_layers_extra:
             self.primary_layers = list(params.primary_layers)
@@ -136,7 +136,7 @@ class Rig:
         eyes_ctrl_e.head[:] =  ( eyeL_ctrl_e.head + eyeR_ctrl_e.head ) / 2
         
         for bone in [ eyeL_ctrl_e, eyeR_ctrl_e, eyes_ctrl_e ]:
-            bone.tail[:] = bone.head + Vector( [ 0, 0, 0.025 ] )
+            bone.tail[:] = bone.head + Vector( [ 0, 0, eyeL_e.length ] )
         
         ## turbo: adding a master eye.X for transforming the whole eye
         eye_master_names = []
@@ -151,7 +151,8 @@ class Rig:
                 
         ## turbo: adding a master nose for transforming the whole nose
         master_nose = copy_bone(self.obj, 'ORG-nose.004', 'nose_master')
-        eb[master_nose].tail[:] = eb[master_nose].head + Vector([0, -0.025, 0])
+        eb[master_nose].tail[:] = \
+            eb[master_nose].head + Vector([0, self.face_length / -4, 0])
         
         # ears ctrls
         earL_name = strip_org( bones['ears'][0] )
@@ -253,7 +254,8 @@ class Rig:
 
             tweaks.append( tweak_name )
 
-            eb[ tweak_name ].tail[:] = eb[ tweak_name ].head + Vector( ( 0, 0, 0.005 ) )
+            eb[ tweak_name ].tail[:] = \
+                eb[ tweak_name ].head + Vector(( 0, 0, self.face_length / 6 ))
 
             # create tail bone
             if bone in tails:
@@ -268,7 +270,8 @@ class Rig:
                 eb[ tweak_name ].parent      = None
 
                 eb[ tweak_name ].head    = eb[ bone ].tail
-                eb[ tweak_name ].tail[:] = eb[ tweak_name ].head + Vector( ( 0, 0, 0.005 ) )
+                eb[ tweak_name ].tail[:] = \
+                    eb[ tweak_name ].head + Vector(( 0, 0, self.face_length / 6 ))
                 
                 tweaks.append( tweak_name )
             
