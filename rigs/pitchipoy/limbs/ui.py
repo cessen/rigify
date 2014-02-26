@@ -48,3 +48,4 @@ def create_script( bones):
         'IK_Strertch',
         'FK_limb_follow'
     )
+
